@@ -6,8 +6,10 @@ set -o nounset
 
 AMPLICON_REF=$1
 BAM=$2 
-FINAL_VCF=$3 
+FINAL_VCF=$3 # conflict.resolved.vcf
 OUTPUT_PREFIX=$4
-THREADS=$5
 
-whatshap phase "${FINAL_VCF}" "${BAM}" -o "${OUTPUT_PREFIX}".phased.vcf --tag=PS -r "${AMPLICON_REF}" --internal-downsampling 23 --threads "${THREADS}"
+bgzip "${FINAL_VCF}"
+tabix "${FINAL_VCF}".gz 
+whatshap phase "${FINAL_VCF}".gz "${BAM}" -o "${OUTPUT_PREFIX}".phased.vcf --tag=PS -r "${AMPLICON_REF}" --internal-downsampling 23 
+rm "${FINAL_VCF}".gz # remove unphased vcf 
