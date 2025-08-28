@@ -294,7 +294,7 @@ def form_final_vcf(resolved, vcfs):
                 new_genotype, quality_source = '/'.join(new_genotype), '/'.join(quality_source)
                     
             vcf_in_pos_line['SAMPLE'] = vcf_in_pos_line['SAMPLE'].replace(vcf_in_pos_line['GT'], new_genotype) 
-            # TO DO: find place to put quality source 
+            # TO DO: find place to log quality source in vcf if needed 
             #+ ':' + quality_source 
             #vcf_in_pos_line['FORMAT'] = vcf_in_pos_line['FORMAT'] + ':SR'
             
