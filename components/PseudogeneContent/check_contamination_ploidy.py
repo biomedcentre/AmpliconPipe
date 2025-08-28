@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np 
 import argparse 
 from scipy.stats import bootstrap
+from sklearn.mixture import GaussianMixture
+from math import sqrt
 
 def read_vcf(link): 
     '''
@@ -55,7 +57,7 @@ def genotype_vectors(vcf):
             vaf = int(row['AD'].split(',')[1])/row['DP']
             gt_vector[variant_id] = [gt_val, vaf, int(row['AD'].split(',')[1]), dp, row['QUAL']]
 
-    gt_vector = pd.DataFrame(gt_vector, columns=['GT', 'VAF', 'AD', 'DP', 'QUAL'])
+    gt_vector = pd.DataFrame(gt_vector, index=['GT', 'VAF', 'AD', 'DP', 'QUAL']).T
     
     return gt_vector
     
@@ -70,16 +72,19 @@ def choose_best_gm(baf_input, max_components=4):
     baf_input = np.array(baf_input).reshape(-1, 1)
     
     # chose best gaussian
-    bic, aic = {}, {}
+    bic, aic, aic_c = {}, {}, {}
     for i in range(1, max_components+1): 
         gm = GaussianMixture(n_components=i, random_state=0).fit(baf_input) 
         bic[i] = gm.bic(baf_input)
         aic[i] = gm.aic(baf_input)
-        
+        aic_c[i] = gm.aic(baf_input) + 2*(2/(len(baf_input)-2))
     # choose best components 
-    best_n = (pd.Series(bic) + pd.Series(aic)).idxmin()
+    best_n = pd.Series(bic).idxmin()
     
-    print((pd.Series(bic) + pd.Series(aic)).sort_values())
+    #print((pd.Series(bic) + pd.Series(aic)).sort_values())
+    print(aic)
+    print(aic_c)
+    print(bic)
 
     gm = GaussianMixture(n_components=best_n, random_state=0).fit(baf_input) 
     
@@ -94,13 +99,22 @@ def vafs_for_ploidy(ploidy):
 
     return vafs
 
+def plot_vaf_vector(vaf_vector, prefix, fit_type): 
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+    sns.distplot(vaf_vector, ax=ax)
+    ax.set_title(f'{fit_type} VAF')
+    plt.rcParams['figure.dpi'] = 150
+    plt.savefig(f'{prefix}.{fit_type}.VAF.png')
 
-def estimate_peak_fits(vaf_vector, log_buffer, max_ploidy=3, fit_type='All variants'): 
+
+def estimate_peak_fits(vaf_vector, log_buffer, prefix, max_ploidy=3, fit_type='All variants'): 
     minimal_peak_size = 5
     best_n, gm = choose_best_gm(vaf_vector)
     pred_labels = pd.Series(gm.predict(np.array(vaf_vector).reshape(-1, 1)), index=vaf_vector.index)
-    good_peaks = pred_labels.value_counts()[pred_labels.value_counts() >= minimal_peak_size]
-    # TO DO add plotting of vaf vector and resulting fit
+    good_peaks = pred_labels.value_counts()[pred_labels.value_counts() >= minimal_peak_size].index
+    plot_vaf_vector(vaf_vector, prefix, fit_type)
     
     if len(good_peaks) == 0:
         log_buffer.append(f'[WARNING] {fit_type} fit: each peak in the best fit contains less than 5 variants. Contamination and ploidy will not be estimated')
@@ -109,14 +123,15 @@ def estimate_peak_fits(vaf_vector, log_buffer, max_ploidy=3, fit_type='All varia
     good_peaks_stats = []
     for i in good_peaks: 
         mu, std = gm.means_[:,0][i], sqrt(gm.covariances_[:,0][:,0][i])
-        confidence_interval, _, _ = bootstrap(vaf_vector[pred_labels == i], np.mean())
-        good_peaks_stats.append([i, mu, std, confidence_interval['low'], confidence_interval['high']])
+        result = bootstrap((np.array(vaf_vector[pred_labels == i]),), np.mean, confidence_level=0.99)
+        good_peaks_stats.append([i, mu, std, result.confidence_interval[0], result.confidence_interval[1]])
 
-    good_peaks_stats = pd.DataFrame(good_peaks_stats, columns=['name', 'mean', 'std', '95_low', '95_high']).sort_values(by='mean', ascending=False)
-
+    good_peaks_stats = pd.DataFrame(good_peaks_stats, columns=['name', 'mu', 'std', 'low', 'high']).sort_values(by='mu', ascending=False)
+    print(good_peaks_stats)
+    
     ploidy = False 
     for p in range(1, max_ploidy+1):
-        expected_vafs = vafs_for_ploidy(ploidy)
+        expected_vafs = vafs_for_ploidy(p)
         if len(expected_vafs) < len(good_peaks):
             log_buffer.append(f'[INFO] {fit_type} fit: Number of VAF peaks more than expected for ploidy {p}. Ploidy rejected')
             continue 
@@ -124,12 +139,12 @@ def estimate_peak_fits(vaf_vector, log_buffer, max_ploidy=3, fit_type='All varia
         peak_match = {}
         for idx, row in good_peaks_stats.iterrows(): # looking for matches for peaks of fit
             for match in expected_vafs[::-1]: # maybe later add distance check 
-                if (match > row['95_low']) & (match < row['95_high']): # will be testing if 95% CI is good enough or need more stringent criteria 
-                    peak_match[name] = match 
+                if (match > (row['mu'] - 2*row['std'])) & (match < (row['mu'] + 2*row['std'])): # 95 CI too strict, using softer 2std 
+                    peak_match[row['name']] = match 
                     expected_vafs = [i for i in expected_vafs if i < match]
                     break # match found, stip iteration over expected vafs
             else: 
-                log_buffer.append(f'[INFO] {fit_type} fit: No match found for peak with mean {row['mean']} and CI ({row['95_low']}-{row['95_high']}) in VAF peaks expected for ploidy {p}. Ploidy rejected')
+                log_buffer.append(f'[INFO] {fit_type} fit: No match found for peak with mean {row["mu"]} and CI ({row["low"]};{row["high"]}) in VAF peaks expected for ploidy {p}. Ploidy rejected')
                 break # further iteration not required
                 
         if len(peak_match) != len(good_peaks_stats):
@@ -146,15 +161,15 @@ def estimate_peak_fits(vaf_vector, log_buffer, max_ploidy=3, fit_type='All varia
 
 def verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, pseudo_vector_in_sample):
     pseudo_v_thres = 0.75
-    fit_fail, ploidy_found, final_ploidy = ~first_data & ~second_data, True, False
+    fit_ok, ploidy_found, final_ploidy = (first_data | second_data), True, False
     
-    if fit_fail: # no data
-        ploidy_found, log_app_type = False, '[WARNING]'
+    if not fit_ok: # no data
+        ploidy_found, log_app_type, final_ploidy = False, '[WARNING]', 2
         verdict = 'Not enough variants for sucessful fits. Contamination and ploidy will not be estimated. Default 2 is used'
 
-    elif not first_ploidy & not second_ploidy: # both ploidies not found 
+    elif (not first_ploidy) & (not second_ploidy): # both ploidies not found 
         ploidy_found, log_app_type = False, '[WARNING]'
-        verdict = 'Two ploidy fits returned contamination or ploidy higher than 3.  Contamination risk'
+        verdict = 'All ploidy fits returned contamination or ploidy higher than 3.  Contamination risk'
     
     elif first_data & ~second_data: # only first fit present
         log_app_type, final_ploidy = '[INFO]', first_ploidy
@@ -164,7 +179,7 @@ def verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, pseudo_
         log_app_type, final_ploidy = '[INFO]', second_ploidy
         verdict = 'Ploidy fitted. No contamination risk'
         
-    elif (first_ploidy | second_ploidy) & ~(~first_ploidy & ~second_ploidy): # one fit good, other no ploidy 
+    elif (first_ploidy | second_ploidy) & ~(first_ploidy & second_ploidy): # one fit good, other no ploidy 
         ploidy_found, log_app_type, final_ploidy = False, '[WARNING]', max(first_ploidy, second_ploidy)
         verdict = 'One of the two fits returned contamination or ploidy higher than 3. Contamination risk'
         
@@ -188,7 +203,7 @@ def verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, pseudo_
                 log_app_type, final_ploidy = '[INFO]', max(first_ploidy, second_ploidy)
                 verdict = 'Ploidies in both fits do not match, one of ploidies higher than 3. No contamination risk. Ploidy detection may be unstable'
 
-    return ~fit_fail, ploidy_found, final_ploidy, verdict, log_app_type
+    return fit_ok, ploidy_found, final_ploidy, verdict, log_app_type
     #return sucessful_fit, ploidy_found, ploidy, text_verdict, log_buffer
 
 
@@ -216,23 +231,23 @@ if __name__ == '__main__':
     
     # do contamination check on all SNP or non-pseudogenic
     log_buffer = []
-    first_data, first_ploidy, log_buffer = estimate_peak_fits(nonpseudo_vector_in_sample['VAF'], log_buffer, max_ploidy=3, fit_type=fit_type)
+    first_data, first_ploidy, log_buffer = estimate_peak_fits(nonpseudo_vector_in_sample['VAF'], log_buffer, args.output_prefix, fit_type=fit_type)
 
     # # do contamination check on pseudo
     if len(pseudo_vector_in_sample) > 0: 
-        second_data, second_ploidy, log_buffer = estimate_peak_fits(pseudo_vector_in_sample['VAF'], log_buffer, max_ploidy=3, fit_type='Pseudogenic variants')
+        second_data, second_ploidy, log_buffer = estimate_peak_fits(pseudo_vector_in_sample['VAF'], log_buffer, args.output_prefix, fit_type='Pseudogenic variants')
         percent_of_pseudogenic = len(pseudo_vector_in_sample)/len(pseudogene_vector)*100 
     else: 
         second_data, second_ploidy, percent_of_pseudogenic = False, False, None
 
     # if quality of fit was low because of split, try them all 
     if (len(pseudo_vector_in_sample) > 0) & ~first_data & ~second_data:
-        first_data, first_ploidy, log_buffer = estimate_peak_fits(gt_vector['VAF'], log_buffer, max_ploidy=3)
+        first_data, first_ploidy, log_buffer = estimate_peak_fits(gt_vector['VAF'], log_buffer, args.output_prefix)
 
-    verdict_results = {j: i for i, j in zip(verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, pseudo_vector_in_sample)], 
+    verdict_results = {j: i for i, j in zip(verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, pseudo_vector_in_sample), 
                                             ['Enough_data_in_fit', 'Ploidy_well_fitted', 'ploidy', 'verdict', 'log_app_type'])}
 
-    log_buffer.append(' '.join([verdict_results['log_app_type'], verdict_results['verdict']))
+    log_buffer.append(' '.join([verdict_results['log_app_type'], verdict_results['verdict']]))
 
     # write logs 
     with open(f'{args.output_prefix}.contamination_ploidy_check.log', 'w') as f: 
