@@ -1,9 +1,13 @@
+import argparse 
 import pandas as pd
 import numpy as np 
-import argparse 
-from scipy.stats import bootstrap
-from sklearn.mixture import GaussianMixture
+import seaborn as sns
+import matplotlib.pyplot as plt
 from math import sqrt
+from sklearn.mixture import GaussianMixture
+
+
+# TO DO: extract constants from all functions and fix them here 
 
 def read_vcf(link): 
     '''
@@ -22,7 +26,6 @@ def read_vcf(link):
 
     # TO DO: add calling region filter or add it to previous pipeline stages 
     
-    # add DP detection 
     vcf = vcf.assign(AD=vcf['SAMPLE'].map(lambda x: x.split(':')[1]),
                   DP=vcf['SAMPLE'].map(lambda x: x.split(':')[2]).astype(int))
     
@@ -35,7 +38,6 @@ def genotype_vectors(vcf):
     :param vcf: pd.DataFrame, read vcf 
     :return gt_vector: dict of lists 
     '''
-    
     gt_vector = {}
     
     for idx, row in vcf.iterrows(): 
@@ -72,26 +74,24 @@ def choose_best_gm(baf_input, max_components=4):
     baf_input = np.array(baf_input).reshape(-1, 1)
     
     # chose best gaussian
-    bic, aic, aic_c = {}, {}, {}
+    bic = {} 
     for i in range(1, max_components+1): 
         gm = GaussianMixture(n_components=i, random_state=0).fit(baf_input) 
         bic[i] = gm.bic(baf_input)
-        aic[i] = gm.aic(baf_input)
-        aic_c[i] = gm.aic(baf_input) + 2*(2/(len(baf_input)-2))
+        
     # choose best components 
     best_n = pd.Series(bic).idxmin()
-    
-    #print((pd.Series(bic) + pd.Series(aic)).sort_values())
-    print(aic)
-    print(aic_c)
-    print(bic)
-
     gm = GaussianMixture(n_components=best_n, random_state=0).fit(baf_input) 
     
     return best_n, gm 
 
 
-def vafs_for_ploidy(ploidy): 
+def vafs_for_ploidy(ploidy):
+    '''
+    Generate vector of expected vaf peak means for given ploidy
+    :param ploidy: int, ploidy
+    :return vafs: list, list of floats, expected vafs 
+    '''
     step = 1/ploidy
     vafs = []
     for i in range(1, ploidy+1): 
@@ -99,69 +99,153 @@ def vafs_for_ploidy(ploidy):
 
     return vafs
 
+
 def plot_vaf_vector(vaf_vector, prefix, fit_type): 
-    import seaborn as sns
-    import matplotlib.pyplot as plt
+    '''
+    Plots current vaf vector
+    :param vaf_vector: pd.Series, vector of vafs for variants
+    :param prefix: str, path to output
+    :param fit_type: str, description of current set of variants 
+    '''
     fig, ax = plt.subplots(1, 1, figsize=(6, 6))
     sns.distplot(vaf_vector, ax=ax)
     ax.set_title(f'{fit_type} VAF')
+    ax.set_xlim(-0.05, 1.05)
     plt.rcParams['figure.dpi'] = 150
     plt.savefig(f'{prefix}.{fit_type}.VAF.png')
 
 
-def estimate_peak_fits(vaf_vector, log_buffer, prefix, max_ploidy=3, fit_type='All variants'): 
+def concat_close_baf_peaks(good_peaks_stats, pred_labels, vaf_vector, allowed_std, max_ploidy):
+    '''
+    Gaussian mixture may create extra peaks that actually belong to same expected VAF peak. To correct that, close peaks will be concated.
+    Closeness is calculated based on intersections between peaks (based on std calculation). 
+    Extra threshold to avoid concating peaks that may intersect due to larger stds but are in different expected VAF peaks is introdused 
+    :param good_peaks_stats: pd.DataFrame, mean and std of peaks
+    :param pred_labels: pd.Series, predicted peaks for variants of vaf vector
+    :param vaf_vector: pd.Series, vector of vafs for variants
+    :param allowed_std: float, num of stds that will be used to calculate peak area 
+    :param max_ploidy: int, maximal ploidy allowed in fit 
+    :return new_good_peaks_stats: pd.DataFrame, updated peak stats 
+    '''
+    intersection_thres = 0.3
+    peak_dist_thres = 1/(max_ploidy + 1)
+    
+    good_peaks_stats.index = good_peaks_stats['name']  
+    peak_groups, current_group, current_stats = [], [good_peaks_stats['name'].iloc[0]], good_peaks_stats.iloc[0]
+    
+    for idx, row in good_peaks_stats.iloc[1:].iterrows():
+        # extract peak intervals for groups 
+        interval = (current_stats['mean'] - allowed_std*current_stats['std'], current_stats['mean'] + allowed_std*current_stats['std'])
+        interval_row = (row['mean'] - allowed_std*row['std'], row['mean'] + allowed_std*row['std'])
+        intersection_percentage = (interval_row[1] - interval[0])/(allowed_std*row['std']*2)
+
+        # peaks that are too close get placed in one group 
+        if (intersection_percentage > intersection_thres) & (abs(row['mean'] - current_stats['mean']) < peak_dist_thres): 
+            current_group.append(idx)   
+            # update stats
+            current_group_samples = pred_labels.isin(current_group)
+            current_stats = {'mean': vaf_vector[current_group_samples].mean(), 'std': vaf_vector[current_group_samples].std()}
+        else:  # if next peak is too far save previous group and start anew 
+            peak_groups.append(current_group)
+            current_group, current_stats = [idx], good_peaks_stats.loc[idx]
+    else: # last group in cycle  
+        peak_groups.append(current_group)
+
+    # form new peak stats 
+    new_good_peaks_stats = []
+    for group in peak_groups: 
+        if len(group) == 1: # one peak in group - use its earlier stats 
+            new_good_peaks_stats.append(list(good_peaks_stats.loc[group[0]]))
+        else: 
+            current_group_samples = pred_labels.isin(group)
+            new_good_peaks_stats.append([''.join([str(g) for g in group]), vaf_vector[current_group_samples].mean(), vaf_vector[current_group_samples].std()])
+
+    new_good_peaks_stats = pd.DataFrame(new_good_peaks_stats, columns=['name', 'mean', 'std'])
+    
+    return new_good_peaks_stats
+            
+
+def estimate_peak_fits(vaf_vector, log_buffer, prefix, max_ploidy=3, fit_type='All variants'):
+    '''
+    Fits GM for VAF vector and checks list of ploidies to see if any fits. 
+    :param vaf_vector: pd.Series, vector of vafs for variants
+    :param log_buffer: list, list of logged string about ploidy fits
+    :param prefix: str, path to output
+    :param max_ploidy: int, max ploidy that will be tested. Default is 3 for better peak resolution
+    :param fit_type: str, description of current set of variants 
+    :return: bool, if there was enough data for fit
+    :return ploidy: bool or int, fit result
+    :return log_buffer: list, updated log_buffer 
+    '''
     minimal_peak_size = 5
+    allowed_std = 3 
+
+    plot_vaf_vector(vaf_vector, prefix, fit_type) # plotting at this point for now
+
+    # choose best GM and filter before merge 
     best_n, gm = choose_best_gm(vaf_vector)
     pred_labels = pd.Series(gm.predict(np.array(vaf_vector).reshape(-1, 1)), index=vaf_vector.index)
     good_peaks = pred_labels.value_counts()[pred_labels.value_counts() >= minimal_peak_size].index
-    plot_vaf_vector(vaf_vector, prefix, fit_type)
     
-    if len(good_peaks) == 0:
+    if len(good_peaks) == 0: # no peaks with enough variants 
         log_buffer.append(f'[WARNING] {fit_type} fit: each peak in the best fit contains less than 5 variants. Contamination and ploidy will not be estimated')
         return False, False, log_buffer 
     
     good_peaks_stats = []
     for i in good_peaks: 
         mu, std = gm.means_[:,0][i], sqrt(gm.covariances_[:,0][:,0][i])
-        result = bootstrap((np.array(vaf_vector[pred_labels == i]),), np.mean, confidence_level=0.99)
-        good_peaks_stats.append([i, mu, std, result.confidence_interval[0], result.confidence_interval[1]])
+        good_peaks_stats.append([i, mu, std]) 
 
-    good_peaks_stats = pd.DataFrame(good_peaks_stats, columns=['name', 'mu', 'std', 'low', 'high']).sort_values(by='mu', ascending=False)
-    print(good_peaks_stats)
-    
+    good_peaks_stats = pd.DataFrame(good_peaks_stats, columns=['name', 'mean', 'std']).sort_values(by='mean', ascending=False)
+    good_peaks_stats = concat_close_baf_peaks(good_peaks_stats, pred_labels, vaf_vector, allowed_std, max_ploidy).sort_values(by='mean', ascending=False)
+ 
     ploidy = False 
-    for p in range(1, max_ploidy+1):
+    for p in range(1, max_ploidy+1): # iterating through ploidies to see if any fits 
         expected_vafs = vafs_for_ploidy(p)
-        if len(expected_vafs) < len(good_peaks):
+        
+        if len(expected_vafs) < len(good_peaks_stats):
             log_buffer.append(f'[INFO] {fit_type} fit: Number of VAF peaks more than expected for ploidy {p}. Ploidy rejected')
             continue 
             
         peak_match = {}
         for idx, row in good_peaks_stats.iterrows(): # looking for matches for peaks of fit
-            for match in expected_vafs[::-1]: # maybe later add distance check 
-                if (match > (row['mu'] - 2*row['std'])) & (match < (row['mu'] + 2*row['std'])): # 95 CI too strict, using softer 2std 
+            for match in expected_vafs[::-1]: # starting from larger vafs as stats table also starts from larger stats 
+                if (match > (row['mean'] - allowed_std*row['std'])) & (match < (row['mean'] + allowed_std*row['std'])):  
                     peak_match[row['name']] = match 
                     expected_vafs = [i for i in expected_vafs if i < match]
-                    break # match found, stip iteration over expected vafs
+                    break # match found, skip iteration over expected vafs
             else: 
-                log_buffer.append(f'[INFO] {fit_type} fit: No match found for peak with mean {row["mu"]} and CI ({row["low"]};{row["high"]}) in VAF peaks expected for ploidy {p}. Ploidy rejected')
-                break # further iteration not required
+                log_buffer.append(f'[INFO] {fit_type} fit: No match found for peak with mean {row["mean"]} and std ({row["std"]}) in VAF peaks expected for ploidy {p}. Ploidy rejected')
+                break # further iteration not required, one mismatching peaks is enough
                 
-        if len(peak_match) != len(good_peaks_stats):
-            continue
-        else: 
+        if len(peak_match) == len(good_peaks_stats):
             log_buffer.append(f'[INFO] {fit_type} fit: All VAF peaks found in VAF peaks expected for ploidy {p}. Ploidy accepted')
             ploidy = p 
             break 
-    else: 
+            
+    else: # if cycle finished without finding ploidy 
         log_buffer.append(f'[WARNING] {fit_type} fit: VAF peaks do not match expected from ploides from 1, 2, 3. Contamination possible ')
 
     return True, ploidy, log_buffer 
 
 
 def verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, pseudo_vector_in_sample):
+    '''
+    Combines results of fits to get final verdict 
+    :param first_data: bool, if first fit had enough data for fit
+    :param first_ploidy: int or bool, result of first fit 
+    :param second_data: bool, if second fit had enough data for fit
+    :param second_ploidy: int or bool, result of second fit 
+    :param pseudo_vector_in_sample: float, persent of pseudogenic variants present in sample
+    :return fit_ok: bool, if any fits had enough data
+    :return ploidy_found: bool, if any fits were sucessfull 
+    :return final_ploidy: int, ploidy if any
+    :return verdict: str, text verdict 
+    :return log_app_type: str, info or warning 
+    '''
+    
     pseudo_v_thres = 0.75
-    fit_ok, ploidy_found, final_ploidy = (first_data | second_data), True, False
+    fit_ok, ploidy_found, final_ploidy = (first_data | second_data), True, None
     
     if not fit_ok: # no data
         ploidy_found, log_app_type, final_ploidy = False, '[WARNING]', 2
@@ -204,7 +288,6 @@ def verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, pseudo_
                 verdict = 'Ploidies in both fits do not match, one of ploidies higher than 3. No contamination risk. Ploidy detection may be unstable'
 
     return fit_ok, ploidy_found, final_ploidy, verdict, log_app_type
-    #return sucessful_fit, ploidy_found, ploidy, text_verdict, log_buffer
 
 
 if __name__ == '__main__':  
