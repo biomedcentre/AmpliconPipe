@@ -128,17 +128,17 @@ def concat_close_baf_peaks(good_peaks_stats, pred_labels, vaf_vector, allowed_st
     :return new_good_peaks_stats: pd.DataFrame, updated peak stats 
     '''
     intersection_thres = 0.3
-    peak_dist_thres = 1/(max_ploidy + 1)
+    peak_dist_thres = 1/(max_ploidy + 2)
     
     good_peaks_stats.index = good_peaks_stats['name']  
     peak_groups, current_group, current_stats = [], [good_peaks_stats['name'].iloc[0]], good_peaks_stats.iloc[0]
     
     for idx, row in good_peaks_stats.iloc[1:].iterrows():
         # extract peak intervals for groups 
-        interval = (current_stats['mean'] - allowed_std*current_stats['std'], current_stats['mean'] + allowed_std*current_stats['std'])
-        interval_row = (row['mean'] - allowed_std*row['std'], row['mean'] + allowed_std*row['std'])
+        interval = (current_stats['mean'] - 2*allowed_std*current_stats['std'], current_stats['mean'] + 2*allowed_std*current_stats['std'])
+        interval_row = (row['mean'] - 2*allowed_std*row['std'], row['mean'] + 2*allowed_std*row['std'])
         intersection_percentage = (interval_row[1] - interval[0])/(allowed_std*row['std']*2)
-
+        
         # peaks that are too close get placed in one group 
         if (intersection_percentage > intersection_thres) & (abs(row['mean'] - current_stats['mean']) < peak_dist_thres): 
             current_group.append(idx)   
@@ -158,9 +158,12 @@ def concat_close_baf_peaks(good_peaks_stats, pred_labels, vaf_vector, allowed_st
             new_good_peaks_stats.append(list(good_peaks_stats.loc[group[0]]))
         else: 
             current_group_samples = pred_labels.isin(group)
-            new_good_peaks_stats.append([''.join([str(g) for g in group]), vaf_vector[current_group_samples].mean(), vaf_vector[current_group_samples].std()])
+            new_good_peaks_stats.append([''.join([str(g) for g in group]),
+                                         vaf_vector[current_group_samples].mean(),
+                                         vaf_vector[current_group_samples].std(),
+                                         current_group_samples.sum()])
 
-    new_good_peaks_stats = pd.DataFrame(new_good_peaks_stats, columns=['name', 'mean', 'std'])
+    new_good_peaks_stats = pd.DataFrame(new_good_peaks_stats, columns=['name', 'mean', 'std', 'samples'])
     
     return new_good_peaks_stats
             
@@ -177,6 +180,7 @@ def estimate_peak_fits(vaf_vector, log_buffer, prefix, max_ploidy=3, fit_type='A
     :return ploidy: bool or int, fit result
     :return log_buffer: list, updated log_buffer 
     '''
+    # TO DO ADDITIONAL CHECK FOR ABSENCE FOR HETEROZYGOUS FOR PLOIDY 1 MAY BE NEEDED 
     minimal_peak_size = 5
     allowed_std = 3 
 
@@ -185,19 +189,19 @@ def estimate_peak_fits(vaf_vector, log_buffer, prefix, max_ploidy=3, fit_type='A
     # choose best GM and filter before merge 
     best_n, gm = choose_best_gm(vaf_vector)
     pred_labels = pd.Series(gm.predict(np.array(vaf_vector).reshape(-1, 1)), index=vaf_vector.index)
-    good_peaks = pred_labels.value_counts()[pred_labels.value_counts() >= minimal_peak_size].index
     
-    if len(good_peaks) == 0: # no peaks with enough variants 
+    peaks_stats = []
+    for i, samples in pred_labels.value_counts().items(): 
+        mu, std = gm.means_[:,0][i], sqrt(gm.covariances_[:,0][:,0][i])
+        peaks_stats.append([i, mu, std, samples]) 
+    peaks_stats = pd.DataFrame(peaks_stats, columns=['name', 'mean', 'std', 'samples']).sort_values(by='mean', ascending=False)
+    
+    concated_peaks_stats = concat_close_baf_peaks(peaks_stats, pred_labels, vaf_vector, allowed_std, max_ploidy).sort_values(by='mean', ascending=False)
+    good_peaks_stats = concated_peaks_stats[concated_peaks_stats['samples'] > minimal_peak_size]
+    
+    if len(good_peaks_stats) == 0: # no peaks with enough variants 
         log_buffer.append(f'[WARNING] {fit_type} fit: each peak in the best fit contains less than 5 variants. Contamination and ploidy will not be estimated')
         return False, False, log_buffer 
-    
-    good_peaks_stats = []
-    for i in good_peaks: 
-        mu, std = gm.means_[:,0][i], sqrt(gm.covariances_[:,0][:,0][i])
-        good_peaks_stats.append([i, mu, std]) 
-
-    good_peaks_stats = pd.DataFrame(good_peaks_stats, columns=['name', 'mean', 'std']).sort_values(by='mean', ascending=False)
-    good_peaks_stats = concat_close_baf_peaks(good_peaks_stats, pred_labels, vaf_vector, allowed_std, max_ploidy).sort_values(by='mean', ascending=False)
  
     ploidy = False 
     for p in range(1, max_ploidy+1): # iterating through ploidies to see if any fits 
@@ -215,7 +219,7 @@ def estimate_peak_fits(vaf_vector, log_buffer, prefix, max_ploidy=3, fit_type='A
                     expected_vafs = [i for i in expected_vafs if i < match]
                     break # match found, skip iteration over expected vafs
             else: 
-                log_buffer.append(f'[INFO] {fit_type} fit: No match found for peak with mean {row["mean"]} and std ({row["std"]}) in VAF peaks expected for ploidy {p}. Ploidy rejected')
+                log_buffer.append(f'[INFO] {fit_type} fit: No match found for peak with mean {row["mean"]} and std {row["std"]} in VAF peaks expected for ploidy {p}. Ploidy rejected')
                 break # further iteration not required, one mismatching peaks is enough
                 
         if len(peak_match) == len(good_peaks_stats):
@@ -246,13 +250,14 @@ def verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, pseudo_
     
     pseudo_v_thres = 0.75
     fit_ok, ploidy_found, final_ploidy = (first_data | second_data), True, None
+
     
     if not fit_ok: # no data
         ploidy_found, log_app_type, final_ploidy = False, '[WARNING]', 2
         verdict = 'Not enough variants for sucessful fits. Contamination and ploidy will not be estimated. Default 2 is used'
 
     elif (not first_ploidy) & (not second_ploidy): # both ploidies not found 
-        ploidy_found, log_app_type = False, '[WARNING]'
+        ploidy_found, log_app_type = False, '[CRITICAL]'
         verdict = 'All ploidy fits returned contamination or ploidy higher than 3.  Contamination risk'
     
     elif first_data & ~second_data: # only first fit present
@@ -262,9 +267,9 @@ def verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, pseudo_
     elif ~first_data & second_data: # only second fit present 
         log_app_type, final_ploidy = '[INFO]', second_ploidy
         verdict = 'Ploidy fitted. No contamination risk'
-        
-    elif (first_ploidy | second_ploidy) & ~(first_ploidy & second_ploidy): # one fit good, other no ploidy 
-        ploidy_found, log_app_type, final_ploidy = False, '[WARNING]', max(first_ploidy, second_ploidy)
+
+    elif (bool(first_ploidy) is False) | (bool(second_ploidy) is False): # one fit good, other no ploidy 
+        ploidy_found, log_app_type, final_ploidy = True, '[CRITICAL]', max(first_ploidy, second_ploidy)
         verdict = 'One of the two fits returned contamination or ploidy higher than 3. Contamination risk'
         
     else: # 2 good fits 
@@ -303,7 +308,7 @@ if __name__ == '__main__':
     gt_vector = genotype_vectors(vcf)
     
     if args.pseudovcf is not None: 
-        pseudo_vcf = read_vcf(link)
+        pseudo_vcf = read_vcf(args.pseudovcf)
         pseudogene_vector = genotype_vectors(pseudo_vcf)
         intersection = pseudogene_vector.index.intersection(gt_vector.index)
         pseudo_vector_in_sample, nonpseudo_vector_in_sample = gt_vector.loc[intersection], gt_vector.drop(intersection)
@@ -326,8 +331,11 @@ if __name__ == '__main__':
     # if quality of fit was low because of split, try them all 
     if (len(pseudo_vector_in_sample) > 0) & ~first_data & ~second_data:
         first_data, first_ploidy, log_buffer = estimate_peak_fits(gt_vector['VAF'], log_buffer, args.output_prefix)
+    elif (len(pseudo_vector_in_sample) > 0) & ~second_data: 
+        second_data, second_ploidy = first_data, first_ploidy
+        first_data, first_ploidy, log_buffer = estimate_peak_fits(gt_vector['VAF'], log_buffer, args.output_prefix)
 
-    verdict_results = {j: i for i, j in zip(verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, pseudo_vector_in_sample), 
+    verdict_results = {j: i for i, j in zip(verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, percent_of_pseudogenic), 
                                             ['Enough_data_in_fit', 'Ploidy_well_fitted', 'ploidy', 'verdict', 'log_app_type'])}
 
     log_buffer.append(' '.join([verdict_results['log_app_type'], verdict_results['verdict']]))
