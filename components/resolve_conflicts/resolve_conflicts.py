@@ -29,6 +29,7 @@ def read_vcf(link, mode):
         vcf = vcf.assign(AD=vcf['SAMPLE'].map(lambda x: x.split(':')[3]),
                   DP=vcf['SAMPLE'].map(lambda x: x.split(':')[2]).astype(int))
     elif mode == 'pileup': 
+        # TO DO modify multiallelic indels
         new_refalt = pd.DataFrame(list(vcf.apply(lambda x: modify_indel_bcftools(x['REF'], x['ALT'], x['INFO']), axis=1)), columns=['REF', 'ALT'])
         vcf = vcf.assign(AD=vcf['SAMPLE'].map(lambda x: x.split(':')[3]),
                   DP=vcf['SAMPLE'].map(lambda x: x.split(':')[2]).astype(int),
