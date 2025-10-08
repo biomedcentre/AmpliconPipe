@@ -10,3 +10,5 @@ RUN mkdir -p /pipeline/reference
 RUN mkdir -p /pipeline/input
 RUN mkdir -p /pipeline/output
 RUN mkdir -p /pipeline/tools
+
+WORKDIR /pipeline/tools

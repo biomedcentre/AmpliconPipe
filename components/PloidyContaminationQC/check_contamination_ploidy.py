@@ -1,3 +1,4 @@
+import os 
 import argparse 
 import pandas as pd
 import numpy as np 
@@ -108,11 +109,12 @@ def plot_vaf_vector(vaf_vector, prefix, fit_type):
     :param fit_type: str, description of current set of variants 
     '''
     fig, ax = plt.subplots(1, 1, figsize=(6, 6))
-    sns.distplot(vaf_vector, ax=ax)
+    sns.histplot(vaf_vector, bins=15, binrange=(0, 1), ax=ax)
+    sns.kdeplot(vaf_vector, ax=ax)
     ax.set_title(f'{fit_type} VAF')
     ax.set_xlim(-0.05, 1.05)
     plt.rcParams['figure.dpi'] = 150
-    plt.savefig(f'{prefix}.{fit_type}.VAF.png')
+    plt.savefig(f'{prefix}.{fit_type}.VAF_mqc.png')
 
 
 def concat_close_baf_peaks(good_peaks_stats, pred_labels, vaf_vector, allowed_std, max_ploidy):
@@ -345,4 +347,4 @@ if __name__ == '__main__':
         for i in log_buffer:
             f.write(i + '\n')
 
-    pd.Series(verdict_results).to_csv(f'{args.output_prefix}.contamination_ploidy_results.txt', sep='\t')
+    pd.DataFrame(verdict_results, index=[os.path.basename(args.output_prefix)]).to_csv(f'{args.output_prefix}.contamination_ploidy_results.txt', sep='\t')

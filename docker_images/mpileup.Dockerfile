@@ -1,6 +1,5 @@
 ## Supply this value at build time: --build-arg threads=<integer>
 ARG threads=4
-ARG builddate
 
 FROM debian:buster-slim AS build
 
@@ -31,14 +30,6 @@ RUN make -j $threads && make install
 
 FROM debian:buster-slim AS production
 
-ARG builddate
-
-LABEL base.image="debian:buster-slim"
-LABEL maintainer="Alexander Gorelyshev"
-LABEL maintainer.email="alexander.gorelyshev@pm.me"
-LABEL description="bcftools with plugins, compiled from source"
-LABEL buildDate=$builddate
-
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         tabix \
@@ -60,4 +51,3 @@ RUN mkdir -p /pipeline/input
 RUN mkdir -p /pipeline/output
 RUN mkdir -p /pipeline/tools
 
-CMD ["echo", " [ !! ] This container expects a mounted script as an entrypoint (e.g. under '/pipeline/tools')."]
