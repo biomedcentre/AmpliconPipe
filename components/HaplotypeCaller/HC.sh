@@ -4,9 +4,16 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-AMPLICON_REF=$1
-BAM=$2 
-OUTPUT_PREFIX=$3
-THREADS=$4
+readonly AMPLICON_REF=$1
+readonly INPUT_BAM=$2 
+readonly THREADS=$3
 
-gatk HaplotypeCaller -R "${AMPLICON_REF}" -I "${BAM}" -O "${OUTPUT_PREFIX}".haplotype.caller.vcf.gz --native-pair-hmm-threads "${THREADS}" --verbosity WARNING
+readonly prefix=$(basename "${INPUT_BAM%%.sorted.dedup.bam}")
+readonly output="/pipeline/output/${prefix}"
+
+gatk HaplotypeCaller -R "${AMPLICON_REF}" -I "${INPUT_BAM}" -O "${output}".haplotype.caller.vcf.gz --native-pair-hmm-threads "${THREADS}" --verbosity WARNING
+
+## These commands ensure that the output is not saved with root:root ownership.
+## GID is group id env variable 
+chown -Rc :"${GID:-0}" /pipeline/output
+chmod -Rc g+w,o-rwx /pipeline/output

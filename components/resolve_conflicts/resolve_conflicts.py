@@ -15,9 +15,9 @@ def read_vcf(link, mode):
     
     contig_start = int(vcf['CHROM'][0].split(':')[-1].split('+')[0]) # TO DO: write more universal pattern function able to work with different contig namings
     vcf = vcf.assign(CHROM=vcf['CHROM'].map(lambda x: x.split(':')[0]),
-                    POS=vcf['POS'] + contig_start - 1,
+                    POS=(vcf['POS'] + contig_start - 1).astype(int),
                     GT=vcf['SAMPLE'].map(lambda x: x.split(':')[0]).str.replace('|', '/', regex=False))
-
+    
     # TO DO: add calling region filter or add it to previous pipeline stages 
     
     # add DP detection 
@@ -275,7 +275,7 @@ def form_final_vcf(resolved, vcfs):
         # need to check DV formats though if merging is possible and needed 
         for caller_type, tab in all_tab.groupby('caller_type'):
             vcf_in_pos_line = vcfs[caller_type][vcfs[caller_type]['POS'] == pos].iloc[0]
-            
+
             if len(vcf_in_pos_line['ALT'].split(',')) == len(tab): 
                 new_genotype, quality_source = vcf_in_pos_line['GT'], '/'.join([caller_type] * len(vcf_in_pos_line['GT'].split('/')))
             else: 
@@ -295,13 +295,14 @@ def form_final_vcf(resolved, vcfs):
                 new_genotype, quality_source = '/'.join(new_genotype), '/'.join(quality_source)
                     
             vcf_in_pos_line['SAMPLE'] = vcf_in_pos_line['SAMPLE'].replace(vcf_in_pos_line['GT'], new_genotype) 
+            
             # TO DO: find place to log quality source in vcf if needed 
             #+ ':' + quality_source 
             #vcf_in_pos_line['FORMAT'] = vcf_in_pos_line['FORMAT'] + ':SR'
             
             final_vcf.append(vcf_in_pos_line)    
 
-    final_vcf = pd.concat(final_vcf, axis=1).T.drop(['GT', 'DP', 'AD'], axis=1).sort_values(by='POS')
+    final_vcf = pd.concat(final_vcf, axis=1).T.drop(['GT', 'DP', 'AD'], axis=1).sort_values(by='POS').reset_index(drop=True)
 
     return final_vcf
 
@@ -319,8 +320,9 @@ def restore_orig_coordinates(final_vcf, orig_link):
           names=['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', 'SAMPLE'], index_col=False)  
     
     contig_start = int(orig_vcf['CHROM'][0].split(':')[-1].split('+')[0]) # написать функции детекции сепараторов или паттерны 
+
     final_vcf = final_vcf.assign(CHROM=orig_vcf['CHROM'].iloc[0],
-                          POS=vcf['POS'] - contig_start + 1)
+                          POS=(final_vcf['POS'].astype(int) - contig_start + 1))
     
     return final_vcf
 

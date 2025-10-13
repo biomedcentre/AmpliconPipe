@@ -4,12 +4,17 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-AMPLICON_REF=$1
-BAM=$2 
-FINAL_VCF=$3 # conflict.resolved.vcf
-OUTPUT_PREFIX=$4
+readonly AMPLICON_REF=$1
+readonly BAM=$2 
+readonly FINAL_VCF=$3 # conflict.resolved.vcf
+
+readonly prefix=$(basename "${BAM%%.sorted.dedup.bam}")
 
 bgzip "${FINAL_VCF}"
 tabix "${FINAL_VCF}".gz 
-whatshap phase "${FINAL_VCF}".gz "${BAM}" -o "${OUTPUT_PREFIX}".phased.vcf --tag=PS -r "${AMPLICON_REF}" --internal-downsampling 23 
-rm "${FINAL_VCF}".gz # remove unphased vcf 
+whatshap phase "${FINAL_VCF}".gz "${BAM}" -o /pipeline/output/"${prefix}".phased.vcf --tag=PS -r "${AMPLICON_REF}" --internal-downsampling 23  
+
+## These commands ensure that the output is not saved with root:root ownership.
+## GID is group id env variable 
+chown -Rc :"${GID:-0}" /pipeline/output
+chmod -Rc g+w,o-rwx /pipeline/output
