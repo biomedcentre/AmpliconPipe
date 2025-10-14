@@ -19,4 +19,4 @@ RUN pip install -r /pipeline/tools/requirements.txt
 
 WORKDIR /pipeline/tools
 
-ENTRYPOINT ["bash"]
+ENTRYPOINT [""]

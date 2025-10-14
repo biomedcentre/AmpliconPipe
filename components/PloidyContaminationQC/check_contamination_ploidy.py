@@ -6,7 +6,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from math import sqrt
 from sklearn.mixture import GaussianMixture
-
+import subprocess 
 
 # TO DO: extract constants from all functions and fix them here 
 
@@ -303,6 +303,7 @@ if __name__ == '__main__':
     parser.add_argument('--hc_vcf', type=str, help='HaplotypeCaller vcf', required=True) # later may switch to mpileup results 
     parser.add_argument('--pseudovcf', type=str, help='Differences in amp sequence from pseudogene', required=False, default=None)
     parser.add_argument('--output_prefix', type=str, help='Output_prefix', required=True)
+    parser.add_argument('--gid', type=str, default='0')
     args = parser.parse_args()
     print("PROGRAM ARGUMENTS: ", vars(args))
 
@@ -348,3 +349,6 @@ if __name__ == '__main__':
             f.write(i + '\n')
 
     pd.DataFrame(verdict_results, index=[os.path.basename(args.output_prefix)]).to_csv(f'{args.output_prefix}.contamination_ploidy_results.txt', sep='\t')
+
+    subprocess.run(['chown', '-Rc', f':{args.gid}', '/pipeline/output'], capture_output=True, text=True, check=True)
+    subprocess.run(['chmod', '-Rc', 'g+w,o-rwx', '/pipeline/output'], capture_output=True, text=True, check=True)

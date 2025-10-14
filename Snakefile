@@ -2,13 +2,13 @@ import os
 
 configfile: "config.yaml"
 
-rep_location = os.path.dirname(os.path.realpath(__file__))
+rep_location = config['repository']
 reference_folder = os.path.dirname(config['references']['amplicon'])
 reference_name = os.path.basename(config['references']['amplicon'])
 bed_name = os.path.basename(config['references']['amplicon_bed'])
 GID = config['user_settings']['GID']
 output_folder = config['output']['output_folder']
-threads=config['run_settings']['threads']
+threads = config['run_settings']['threads']
 input_folder = config['input']['input_folder']
 
 samples = ["770924470801_CYP21A2_S40"]
@@ -20,6 +20,7 @@ rule all:
         
 
 rule fastq2bam:
+    threads: int(config['run_settings']['threads'])
     input: 
         r1 = os.path.join(input_folder, "{sample}_R1_001.fastq.gz"),
         r2 = os.path.join(input_folder, "{sample}_R2_001.fastq.gz")
@@ -29,7 +30,7 @@ rule fastq2bam:
         fastp_json = os.path.join(output_folder, "{sample}.json")
     shell: 
         '''
-        docker run -v /primary/data/zantysheva/projects/vdkn/AmpPipe_testing/in:/pipeline/input:ro \
+        docker run --rm -v /primary/data/zantysheva/projects/vdkn/AmpPipe_testing/in:/pipeline/input:ro \
         -v {rep_location}/components:/pipeline/tools/components:ro \
         -v {reference_folder}:/pipeline/reference:ro \
         -v {output_folder}:/pipeline/output \
@@ -39,6 +40,7 @@ rule fastq2bam:
 
 
 rule HaplotypeCaller: 
+    threads: int(config['run_settings']['threads'])
     input: 
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
@@ -47,7 +49,7 @@ rule HaplotypeCaller:
         hc_vcf_tbi = os.path.join(output_folder, "{sample}.haplotype.caller.vcf.gz.tbi")
     shell:
         '''
-        docker run -v  {output_folder}:/pipeline/input:ro \
+        docker run --rm -v  {output_folder}:/pipeline/input:ro \
         -v {rep_location}/components:/pipeline/tools/components:ro \
         -v {reference_folder}:/pipeline/reference:ro \
         -v {output_folder}:/pipeline/output \
@@ -57,6 +59,7 @@ rule HaplotypeCaller:
 
 
 rule mosdepth:
+    threads: int(config['run_settings']['threads'])
     input:
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
@@ -65,7 +68,7 @@ rule mosdepth:
         thresholds = os.path.join(output_folder, "{sample}.thresholds.bed.gz")
     shell:
         '''
-        docker run -v  {output_folder}:/pipeline/input:ro \
+        docker run --rm -v  {output_folder}:/pipeline/input:ro \
         -v {rep_location}/components:/pipeline/tools/components:ro \
         -v {reference_folder}:/pipeline/reference:ro \
         -v {output_folder}:/pipeline/output \
@@ -75,6 +78,7 @@ rule mosdepth:
 
 
 rule mpileup: 
+    threads: int(config['run_settings']['threads'])
     input:
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
@@ -83,7 +87,7 @@ rule mpileup:
         mpileup_tbi = os.path.join(output_folder, "{sample}.bcftools.vcf.gz.tbi")
     shell: 
         '''
-        docker run -v  {output_folder}:/pipeline/input:ro \
+        docker run --rm -v  {output_folder}:/pipeline/input:ro \
         -v {rep_location}/components:/pipeline/tools/components:ro \
         -v {reference_folder}:/pipeline/reference:ro \
         -v {output_folder}:/pipeline/output \
@@ -93,6 +97,7 @@ rule mpileup:
 
 
 rule DeepVariant:
+    threads: int(config['run_settings']['threads'])
     input:
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
@@ -100,11 +105,11 @@ rule DeepVariant:
         dv_vcf = os.path.join(output_folder, "{sample}.deepvariant.vcf")
     shell:
         '''
-        docker run -v  {output_folder}:/pipeline/input:ro \
+        docker run --rm -v  {output_folder}:/pipeline/input:ro \
         -v {rep_location}/components:/pipeline/tools/components:ro \
         -v {reference_folder}:/pipeline/reference:ro \
         -v {output_folder}:/pipeline/output \
-        -e GID={GID} deepvariant \
+        -e GID={GID} -e THREADS={threads} deepvariant \
         /pipeline/tools/components/DeepVariant/DV.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam /pipeline/reference/{bed_name}
         '''
 
@@ -118,11 +123,11 @@ rule resolve_conflicts:
         final_vcf = os.path.join(output_folder, "{sample}.conflict.resolved.vcf")
     shell: 
         '''
-        docker run -v  {output_folder}:/pipeline/input:ro \
+        docker run --rm -v  {output_folder}:/pipeline/input:ro \
         -v {rep_location}/components:/pipeline/tools/components:ro \
         -v {output_folder}:/pipeline/output \
         -e GID={GID} python_and_whatshap \
-        python3 components/resolve_conflicts/resolve_conflicts.py --hc_vcf /pipeline/input/{wildcards.sample}.haplotype.caller.vcf.gz --dv_vcf /pipeline/input/{wildcards.sample}.deepvariant.vcf --pileup /pipeline/input/{wildcards.sample}.bcftools.vcf.gz --output_prefix /pipeline/output/{wildcards.sample}
+        python3 components/resolve_conflicts/resolve_conflicts.py --hc_vcf /pipeline/input/{wildcards.sample}.haplotype.caller.vcf.gz --dv_vcf /pipeline/input/{wildcards.sample}.deepvariant.vcf --pileup /pipeline/input/{wildcards.sample}.bcftools.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID}
         '''
 
 
@@ -135,11 +140,11 @@ rule whatshap:
         phased_vcf = os.path.join(output_folder, "{sample}.phased.vcf")
     shell: 
         '''
-        docker run -v  {output_folder}:/pipeline/input:ro \
+        docker run --rm -v  {output_folder}:/pipeline/input:ro \
         -v {rep_location}/components:/pipeline/tools/components:ro \
         -v {output_folder}:/pipeline/output \
         -e GID={GID} python_and_whatshap \
-        components/whatshap/whatshap.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam  /pipeline/output/{wildcards.sample}.conflict.resolved.vcf
+        bash components/whatshap/whatshap.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam  /pipeline/output/{wildcards.sample}.conflict.resolved.vcf
         '''
 
 
@@ -150,9 +155,9 @@ rule PloidyContaminationQC:
         qc_result = os.path.join(output_folder, "{sample}.contamination_ploidy_results.txt")
     shell: 
         '''
-        docker run -v  {output_folder}:/pipeline/input:ro \
+        docker run --rm -v  {output_folder}:/pipeline/input:ro \
         -v {rep_location}/components:/pipeline/tools/components:ro \
         -v {output_folder}:/pipeline/output \
         -e GID={GID} python_and_whatshap \
-        python3 components/PloidyContaminationQC/check_contamination_ploidy.py --hc_vcf /pipeline/input/{wildcards.sample}.haplotype.caller.vcf.gz --output_prefix /pipeline/output/{wildcards.sample}
+        python3 components/PloidyContaminationQC/check_contamination_ploidy.py --hc_vcf /pipeline/input/{wildcards.sample}.haplotype.caller.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID}
         '''

@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import argparse
 import gzip 
+import subprocess 
 
 def read_vcf(link, mode): 
     '''
@@ -353,6 +354,7 @@ if __name__ == '__main__':
     parser.add_argument('--dv_vcf', type=str, help='DeepVariant vcf', required=True)
     parser.add_argument('--pileup', type=str, help='Bcftools pileup', required=True)
     parser.add_argument('--output_prefix', type=str, help='Output_prefix', required=True)
+    parser.add_argument('--gid', type=str, default='0')
     args = parser.parse_args()
     print("PROGRAM ARGUMENTS: ", vars(args))
 
@@ -376,3 +378,6 @@ if __name__ == '__main__':
     comments =  form_comments_for_final_vcf(vcf_comments)
     
     write_vcf(comments, final_vcf, f'{args.output_prefix}.conflict.resolved.vcf')
+
+    subprocess.run(['chown', '-Rc', f':{args.gid}', '/pipeline/output'], capture_output=True, text=True, check=True)
+    subprocess.run(['chmod', '-Rc', 'g+w,o-rwx', '/pipeline/output'], capture_output=True, text=True, check=True)

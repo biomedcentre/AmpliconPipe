@@ -20,10 +20,12 @@ readonly GVCF="${OUTPUT_BASENAME}.deepvariant.gvcf"
   --reads="${INPUT_BAM}" \
   --regions="${REGIONS_BED}" \
   --output_vcf="/pipeline/output/${VCF}" \
-  --output_gvcf="/pipeline/output/${GVCF}" \
+ # --output_gvcf="/pipeline/output/${GVCF}" \
   --num_shards="${THREADS:-23}" \
-  --logging_dir="/pipeline/output/logs" \
+  --logging_dir="/pipeline/output/deep_variant_logs" \
   --dry_run=false
+
+mv 
 
 ## These commands ensure that the output is not saved with root:root ownership.
 ## GID is group id env variable 
