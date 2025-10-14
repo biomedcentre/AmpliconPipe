@@ -262,11 +262,11 @@ def verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, pseudo_
         ploidy_found, log_app_type = False, '[CRITICAL]'
         verdict = 'All ploidy fits returned contamination or ploidy higher than 3.  Contamination risk'
     
-    elif first_data & ~second_data: # only first fit present
+    elif first_data & (not second_data): # only first fit present
         log_app_type, final_ploidy = '[INFO]', first_ploidy
         verdict = 'Ploidy fitted. No contamination risk'
         
-    elif ~first_data & second_data: # only second fit present 
+    elif (not first_data) & second_data: # only second fit present 
         log_app_type, final_ploidy = '[INFO]', second_ploidy
         verdict = 'Ploidy fitted. No contamination risk'
 
@@ -331,9 +331,9 @@ if __name__ == '__main__':
         second_data, second_ploidy, percent_of_pseudogenic = False, False, None
 
     # if quality of fit was low because of split, try them all 
-    if (len(pseudo_vector_in_sample) > 0) & ~first_data & ~second_data:
+    if (len(pseudo_vector_in_sample) > 0) & (not first_data) & (not second_data):
         first_data, first_ploidy, log_buffer = estimate_peak_fits(gt_vector['VAF'], log_buffer, args.output_prefix)
-    elif (len(pseudo_vector_in_sample) > 0) & ~second_data: 
+    elif (len(pseudo_vector_in_sample) > 0) & (not second_data): 
         second_data, second_ploidy = first_data, first_ploidy
         first_data, first_ploidy, log_buffer = estimate_peak_fits(gt_vector['VAF'], log_buffer, args.output_prefix)
 
