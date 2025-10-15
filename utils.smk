@@ -1,0 +1,79 @@
+import glob
+import os
+
+# ===variables===
+
+rep_location = config['repository']
+reference_folder = os.path.dirname(config['references']['amplicon'])
+reference_name = os.path.basename(config['references']['amplicon'])
+reference_prefix = reference_name.split('.fasta')[0] 
+
+pseudo_coords = config['references']['pseudogene_coordinates']
+
+bed_name = os.path.basename(config['references']['amplicon_bed'])
+GID = config['user_settings']['GID']
+output_folder = config['output']['output_folder']
+threads = config['run_settings']['threads']
+input_folder = config['input']['input_folder']
+
+# ===functions===
+
+def filename_to_sample(name):
+    basename = os.path.basename(name)
+
+    for i in config['input']['fastq_extensions']:
+        if i in basename: 
+            basename = basename.split(i)[0]
+            break
+
+    if '_L' in basename:
+        # Find position of _L followed by 3 digits and _R1 or _R2
+        import re
+        pattern = r'_L\d{3}_R[12]'
+        match = re.search(pattern, basename)
+        if match:
+            sample_name = basename[:match.start()]
+            return sample_name
+
+    if '_R1' in basename:
+        sample_name = basename.split('_R1')[0]
+        return sample_name
+    elif '_R2' in basename:
+        sample_name = basename.split('_R2')[0]
+        return sample_name
+
+    return basename 
+
+
+def get_sample_names(input_folder): 
+    '''
+    Detects all sample names in input folder 
+    :param: input_folder: str, given input folder
+    '''
+    all_files = []
+    for i in config['input']['fastq_extensions']:
+        all_files = all_files + glob.glob(os.path.join(input_folder, f'*{i}'))
+
+    sample_names = [filename_to_sample(name) for name in all_files]
+
+    # find sample names that have at least 2 fastq 
+    sample_counts = {}
+    for s in sample_names: 
+        if s in sample_counts: 
+            sample_counts[s] += 1
+        else: 
+            sample_counts[s] = 1
+
+    final_samples = [s for s in sample_counts if sample_counts[s] > 1]
+
+    return final_samples
+
+
+def get_fastq_input(wildcards, input_folder, rgroup):
+    sample = wildcards.sample
+    all_files = []
+    for i in config['input']['fastq_extensions']:
+        print(os.path.join(input_folder, f'{sample}*{rgroup}*{i}'))
+        all_files = all_files + glob.glob(os.path.join(input_folder, f'{sample}*{rgroup}*{i}'))
+
+    return sorted(all_files)[0]
