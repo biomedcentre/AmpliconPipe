@@ -1,3 +1,10 @@
+input:
+    input_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/in'
+    fastq_extensions: ['fastq.gz', 'fq.gz']
+    
+output:
+    output_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/out_4'
+
 references: 
     amplicon: '/primary/data/zantysheva/git_clones/AmpliconPipe/reference/CYP21A2/CYP21A2-amp_hg38.fasta' # Amplicon fasta .fasta
     amplicon_bed: '/primary/data/zantysheva/git_clones/AmpliconPipe/reference/CYP21A2/CYP21A2.bed' # bed file for calling interval. can be the all amplicon span
@@ -12,9 +19,4 @@ run_settings:
 user_settings:
     GID: 2009
 
-input:
-    input_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/in'
-
-output:
-    output_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/out_4'
 

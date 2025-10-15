@@ -10,7 +10,7 @@ readonly FINAL_VCF=$3 # conflict.resolved.vcf
 
 readonly prefix=$(basename "${BAM%%.sorted.dedup.bam}")
 
-bgzip "${FINAL_VCF}"
+bgzip -f "${FINAL_VCF}"
 tabix "${FINAL_VCF}".gz 
 whatshap phase "${FINAL_VCF}".gz "${BAM}" -o /pipeline/output/"${prefix}".phased.vcf --tag=PS -r "${AMPLICON_REF}" --internal-downsampling 23  
 
