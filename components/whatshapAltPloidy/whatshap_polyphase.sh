@@ -12,7 +12,7 @@ readonly PLOIDY=$5
 
 bgzip "${FINAL_VCF}"
 tabix "${FINAL_VCF}".gz 
-whatshap polyphase "${FINAL_VCF}".gz "${BAM}" -o "${OUTPUT_PREFIX}".phased.vcf --tag=PS -r "${AMPLICON_REF}" -p "${PLOIDY}" --threads "${THREADS}"
+whatshap polyphase "${FINAL_VCF}".gz "${BAM}" -o "${OUTPUT_PREFIX}".alt.ploidy.phased.vcf --tag=PS -r "${AMPLICON_REF}" -p "${PLOIDY}" --threads "${THREADS}"
 
 ## These commands ensure that the output is not saved with root:root ownership.
 ## GID is group id env variable 

@@ -8,13 +8,19 @@ reference_folder = os.path.dirname(config['references']['amplicon'])
 reference_name = os.path.basename(config['references']['amplicon'])
 reference_prefix = reference_name.split('.fasta')[0] 
 
+
 pseudo_coords = config['references']['pseudogene_coordinates']
+pseudo_vcf_use = f'--pseudovcf {reference_prefix}.vs.{pseudo_coords}.difference.vcf' if pseudo_coords is not None else '' 
+if config['references']['full_genome']:
+    ref_name = os.path.basename(config['references']['full_genome'])
+    full_ref_dir = os.path.dirname(config['references']['full_genome'])
 
 bed_name = os.path.basename(config['references']['amplicon_bed'])
 GID = config['user_settings']['GID']
 output_folder = config['output']['output_folder']
 threads = config['run_settings']['threads']
 input_folder = config['input']['input_folder']
+
 
 # ===functions===
 
@@ -73,7 +79,6 @@ def get_fastq_input(wildcards, input_folder, rgroup):
     sample = wildcards.sample
     all_files = []
     for i in config['input']['fastq_extensions']:
-        print(os.path.join(input_folder, f'{sample}*{rgroup}*{i}'))
         all_files = all_files + glob.glob(os.path.join(input_folder, f'{sample}*{rgroup}*{i}'))
 
     return sorted(all_files)[0]

@@ -13,9 +13,9 @@ readonly prefix=$(basename "${INPUT_BAM%%.sorted.dedup.bam}")
 readonly output="/pipeline/output/${prefix}"
 
 bcftools mpileup --threads "${THREADS}" -f "${AMPLICON_REF}" -L 20000 -a FORMAT/AD,FORMAT/DP --no-BAQ -d 3000 -Ou "${INPUT_BAM}" | \
-bcftools call --ploidy "${PLOIDY}" -mv -Oz -o "${output}".bcftools.altploidy.vcf.gz
+bcftools call --ploidy "${PLOIDY}" -mv -Oz -o "${output}".alt.ploidy.bcftools.vcf.gz
 
-tabix "${output}".bcftools.altploidy.vcf.gz
+tabix "${output}".alt.ploidy.bcftools.vcf.gz
 
 ## These commands ensure that the output is not saved with root:root ownership.
 ## GID is group id env variable 
