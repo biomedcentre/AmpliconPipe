@@ -5,27 +5,11 @@ include: "utils.smk"
 
 samples = get_sample_names(input_folder)
 print(samples)
-print(pseudo_vcf_use)
 
 rule all: 
     input: 
         expand(os.path.join(output_folder, "{sample}.contamination_ploidy_results.txt"), sample=samples),
         expand(os.path.join(output_folder, "{sample}.phased.vcf"), sample=samples)
-
-
-rule gatk_dict:
-    threads: int(config['run_settings']['threads'])
-    input:
-        ancient(config['references']['amplicon'])
-    output: 
-        ref_dict = os.path.join(reference_folder, "{reference_prefix}.dict")
-    shell:
-        '''
-        docker run --rm -v {reference_folder}:/pipeline/reference \
-        -v {rep_location}/components:/pipeline/tools/components:ro \
-        -e GID={GID} gatk \
-        components/gatk_dict/gatk_dict.sh /pipeline/reference/{reference_name} /pipeline/reference/{reference_prefix}.dict
-        '''
         
 
 rule fastq2bam:
@@ -33,11 +17,11 @@ rule fastq2bam:
     input: 
         r1 = lambda wildcards: get_fastq_input(wildcards, input_folder, 'R1'),
         r2 = lambda wildcards: get_fastq_input(wildcards, input_folder, 'R2'),
-        #ref_0123 = os.path.join(reference_folder, "{reference_name}.0123"),
-        #ref_amb = os.path.join(reference_folder, "{reference_name}.amb"),
-        #ref_ann = os.path.join(reference_folder, "{reference_name}.ann"),
-        #ref_bwt = os.path.join(reference_folder, "{reference_name}.bwt.2bit.64"),
-        #ref_pac = os.path.join(reference_folder, "{reference_name}.pac")
+        ref_0123 = os.path.join(reference_folder, f"{reference_name}.0123"),
+        ref_amb = os.path.join(reference_folder, f"{reference_name}.amb"),
+        ref_ann = os.path.join(reference_folder, f"{reference_name}.ann"),
+        ref_bwt = os.path.join(reference_folder, f"{reference_name}.bwt.2bit.64"),
+        ref_pac = os.path.join(reference_folder, f"{reference_name}.pac")
     output: 
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai"),
@@ -58,7 +42,7 @@ rule HaplotypeCaller:
     input: 
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai"),
-        ref_dict = os.path.join(reference_folder, "{reference_prefix}.dict")
+        ref_dict = os.path.join(reference_folder, f"{reference_prefix}.dict")
     output:
         hc_vcf = os.path.join(output_folder, "{sample}.haplotype.caller.vcf.gz"),
         hc_vcf_tbi = os.path.join(output_folder, "{sample}.haplotype.caller.vcf.gz.tbi")
@@ -167,7 +151,7 @@ rule whatshap:
 rule PloidyContaminationQC:
     input: 
         hc_vcf = os.path.join(output_folder, "{sample}.haplotype.caller.vcf.gz"),
-        pseudo_diff_vcf = os.path.join(output_folder, "{reference_prefix}.vs.{pseudo_coords}.difference.vcf") if pseudo_coords is not None else [] 
+        pseudo_diff_vcf = os.path.join(output_folder, f"{reference_prefix}.vs.{pseudo_coords}.difference.vcf") if pseudo_coords is not None else [] 
     output: 
         qc_result = os.path.join(output_folder, "{sample}.contamination_ploidy_results.txt")
     shell: 
@@ -183,13 +167,13 @@ rule PloidyContaminationQC:
 rule index_reference: 
     threads: int(config['run_settings']['threads'])
     input:
-        ref_fasta = config['references']['amplicon']
+        ancient(config['references']['amplicon'])
     output: 
-        ref_0123 = os.path.join(reference_folder, "{reference_name}.0123"),
-        ref_amb = os.path.join(reference_folder, "{reference_name}.amb"),
-        ref_ann = os.path.join(reference_folder, "{reference_name}.ann"),
-        ref_bwt = os.path.join(reference_folder, "{reference_name}.bwt.2bit.64"),
-        ref_pac = os.path.join(reference_folder, "{reference_name}.pac")
+        ref_0123 = os.path.join(reference_folder, f"{reference_name}.0123"),
+        ref_amb = os.path.join(reference_folder, f"{reference_name}.amb"),
+        ref_ann = os.path.join(reference_folder, f"{reference_name}.ann"),
+        ref_bwt = os.path.join(reference_folder, f"{reference_name}.bwt.2bit.64"),
+        ref_pac = os.path.join(reference_folder, f"{reference_name}.pac")
     shell: 
         '''
         docker run --rm -v {reference_folder}:/pipeline/reference \
@@ -199,34 +183,49 @@ rule index_reference:
         '''
 
 
+rule gatk_dict:
+    threads: int(config['run_settings']['threads'])
+    input:
+        ancient(config['references']['amplicon'])
+    output: 
+        ref_dict = os.path.join(reference_folder, f"{reference_prefix}.dict")
+    shell:
+        '''
+        docker run --rm -v {reference_folder}:/pipeline/reference \
+        -v {rep_location}/components:/pipeline/tools/components:ro \
+        -e GID={GID} gatk \
+        components/gatk_dict/gatk_dict.sh /pipeline/reference/{reference_name} /pipeline/reference/{reference_prefix}.dict
+        '''
+
+
 rule pseudogenic_synth_reads: 
     threads: int(config['run_settings']['threads'])
     output: 
-        pseudo_r1 = os.path.join(output_folder, "{pseudo_coords}.temp.pseudo_read1.fq.gz"),
-        pseudo_r2 = os.path.join(output_folder, "{pseudo_coords}.temp.pseudo_read2.fq.gz")
+        temp(os.path.join(output_folder, f"{pseudo_coords}.temp.pseudo_read1.fq.gz")),
+        temp(os.path.join(output_folder, f"{pseudo_coords}.temp.pseudo_read2.fq.gz"))
     shell: 
         '''
         docker run --rm -v {full_ref_dir}:/pipeline/input:ro \
         -v {rep_location}/components:/pipeline/tools/components:ro \
         -v {output_folder}:/pipeline/output \
-        -e GID=2009 -generate_pseudo_reads \
+        -e GID=2009 generate_pseudo_reads \
         components/GenePseudogeneDifference/generate_pseudo_reads_fastq.sh -P {pseudo_coords} \
-        -R /pipeline/reference/{ref_name} -j {threads}
+        -R /pipeline/input/{ref_name} -j {threads}
         '''
 
 
 rule generate_pseudo_synth_bam: 
     threads: int(config['run_settings']['threads'])
     input: 
-        pseudo_r1 = os.path.join(output_folder, "{pseudo_coords}.temp.pseudo_read1.fq.gz"),
-        pseudo_r2 = os.path.join(output_folder, "{pseudo_coords}.temp.pseudo_read2.fq.gz"),
-        ref_0123 = os.path.join(reference_folder, "{reference_name}.0123"),
-        ref_amb = os.path.join(reference_folder, "{reference_name}.amb"),
-        ref_ann = os.path.join(reference_folder, "{reference_name}.ann"),
-        ref_bwt = os.path.join(reference_folder, "{reference_name}.bwt.2bit.64"),
-        ref_pac = os.path.join(reference_folder, "{reference_name}.pac")
+        pseudo_r1 = os.path.join(output_folder, f"{pseudo_coords}.temp.pseudo_read1.fq.gz"),
+        pseudo_r2 = os.path.join(output_folder, f"{pseudo_coords}.temp.pseudo_read2.fq.gz"),
+        ref_0123 = os.path.join(reference_folder, f"{reference_name}.0123"),
+        ref_amb = os.path.join(reference_folder, f"{reference_name}.amb"),
+        ref_ann = os.path.join(reference_folder, f"{reference_name}.ann"),
+        ref_bwt = os.path.join(reference_folder, f"{reference_name}.bwt.2bit.64"),
+        ref_pac = os.path.join(reference_folder, f"{reference_name}.pac")
     output: 
-        temp_bam = os.path.join(output_folder, "{pseudo_coords}.pseudoalign.bam") 
+        temp(os.path.join(output_folder, f"{pseudo_coords}.pseudoalign.bam"))
     shell:
         '''
         docker run --rm -v {output_folder}:/pipeline/input:ro \
@@ -241,10 +240,10 @@ rule generate_pseudo_synth_bam:
 rule call_variants_different_in_gene: 
     threads: int(config['run_settings']['threads'])
     input:
-        temp_bam = os.path.join(output_folder, "{pseudo_coords}.pseudoalign.bam"), 
-        ref_dict = os.path.join(reference_folder, "{reference_prefix}.dict")
+        temp_bam = os.path.join(output_folder, f"{pseudo_coords}.pseudoalign.bam"), 
+        ref_dict = os.path.join(reference_folder, f"{reference_prefix}.dict")
     output:
-        pseudo_diff_vcf = os.path.join(output_folder, "{reference_prefix}.vs.{pseudo_coords}.difference.vcf") 
+        pseudo_diff_vcf = os.path.join(output_folder, f"{reference_prefix}.vs.{pseudo_coords}.difference.vcf") 
     shell:
         '''
         docker run --rm -v  {output_folder}:/pipeline/input:ro \
@@ -260,7 +259,7 @@ rule HaplotypeCallerAltPloidy:
     input: 
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai"),
-        ref_dict = os.path.join(reference_folder, "{reference_prefix}.dict")
+        ref_dict = os.path.join(reference_folder, f"{reference_prefix}.dict")
         # ploidy = 3  might read it from file here
     output:
         hc_vcf_alt = os.path.join(output_folder, "{sample}.alt.ploidy.haplotype.caller.vcf.gz"),

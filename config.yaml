@@ -6,10 +6,10 @@ output:
     output_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/out_4'
 
 references: 
-    amplicon: '/primary/data/zantysheva/git_clones/AmpliconPipe/reference/CYP21A2/CYP21A2-amp_hg38.fasta' # Amplicon fasta .fasta
-    amplicon_bed: '/primary/data/zantysheva/git_clones/AmpliconPipe/reference/CYP21A2/CYP21A2.bed' # bed file for calling interval. can be the all amplicon span
-    pseudogene_coordinates:  # Optional. If the amplicon has highly homological sequence in genome (>=90%) e.g. CYP21A1P for CYP21A2, CYP2D7 for CYP2D6, SMN2 for SMN1, coordinates can be given to check contamination from this region specifically. Better performance is achieved if coordinates for homological region include all the length of homological region in amplicon, not only gene or pseudogene. Adding extra ~1000 b.p on sides also can help 
-    full_genome:  # Optional. full reference sequence of the organism. Required only if pseudogene coordinates are given 
+    amplicon: '/primary/data/zantysheva/git_clones/AmpliconPipe/reference/CYP21A2_2/CYP21A2-amp_hg38.fasta' # Amplicon fasta .fasta
+    amplicon_bed: '/primary/data/zantysheva/git_clones/AmpliconPipe/reference/CYP21A2_2/CYP21A2.bed' # bed file for calling interval. can be the all amplicon span
+    pseudogene_coordinates: 'chr6:32005689-32008399' # Optional. If the amplicon has highly homological sequence in genome (>=90%) e.g. CYP21A1P for CYP21A2, CYP2D7 for CYP2D6, SMN2 for SMN1, coordinates can be given to check contamination from this region specifically. Better performance is achieved if coordinates for homological region include all the length of homological region in amplicon, not only gene or pseudogene. Adding extra ~1000 b.p on sides also can help 
+    full_genome: '/primary/data/zantysheva/data/reference/Homo_sapiens_assembly38/Homo_sapiens_assembly38.fasta' # Optional. full reference sequence of the organism. Required only if pseudogene coordinates are given 
 
 repository: '/primary/data/zantysheva/git_clones/AmpliconPipe'
     

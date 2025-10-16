@@ -18,8 +18,6 @@ bwa-mem2/bwa-mem2 mem -t "${THREADS}" "${AMPLICON_REF}" /pipeline/input/"${PSEUD
 samtools view -@ "${THREADS}" -S -b - |
 samtools sort  -@ "${THREADS}" - > /pipeline/output/"${PSEUDO_COORDS}".pseudoalign.bam
 
-rm /pipeline/output/"${PSEUDO_COORDS}".temp.pseudo_read1.fq.gz /pipeline/output/"${PSEUDO_COORDS}".temp.pseudo_read2.fq.gz 
-
 ## These commands ensure that the output is not saved with root:root ownership.
 ## GID is group id env variable 
 chown -Rc :"${GID:-0}" /pipeline/output

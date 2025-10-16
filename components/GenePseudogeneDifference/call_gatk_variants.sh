@@ -33,7 +33,7 @@ gatk HaplotypeCaller \
          --native-pair-hmm-threads "${THREADS}" \
          --verbosity WARNING
 
-rm /pipeline/output/"${PSEUDO_COORDS}".pseudoalign.replacerg.bam /pipeline/output/"${PSEUDO_COORDS}".pseudoalign.replacerg.bam.bai /pipeline/output/"${PSEUDO_COORDS}".pseudoalign.bam 
+rm /pipeline/output/"${PSEUDO_COORDS}".pseudoalign.replacerg.bam /pipeline/output/"${PSEUDO_COORDS}".pseudoalign.replacerg.bam.bai  
 
 ## These commands ensure that the output is not saved with root:root ownership.
 ## GID is group id env variable 
