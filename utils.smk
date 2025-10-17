@@ -11,6 +11,7 @@ reference_prefix = reference_name.split('.fasta')[0]
 
 pseudo_coords = config['references']['pseudogene_coordinates']
 pseudo_vcf_use = f'--pseudovcf /pipeline/output/{reference_prefix}.vs.{pseudo_coords}.difference.vcf' if pseudo_coords is not None else '' 
+multiqc_config = 'multiqc_config_template_pseudogenic.yaml' if pseudo_coords is not None else 'multiqc_config_template.yaml'
 if config['references']['full_genome']:
     ref_name = os.path.basename(config['references']['full_genome'])
     full_ref_dir = os.path.dirname(config['references']['full_genome'])
@@ -82,3 +83,12 @@ def get_fastq_input(wildcards, input_folder, rgroup):
         all_files = all_files + glob.glob(os.path.join(input_folder, f'{sample}*{rgroup}*{i}'))
 
     return sorted(all_files)[0]
+
+
+def get_alt_need(wildcards): 
+     with checkpoints.PloidyContaminationQC.get(sample=wildcards.sample).output.qc_result.open() as file:
+        line = file.readlines()[1].strip('\n').split('\t')
+        if (line[-1] != "[CRITICAL]") & (line[-3] > 2):
+            os.path.join(output_folder, f"{wildcards.sample}.alt.ploidy.phased.vcf")
+        else: 
+            return [] 

@@ -9,7 +9,8 @@ print(samples)
 rule all: 
     input: 
         expand(os.path.join(output_folder, "{sample}.contamination_ploidy_results.txt"), sample=samples),
-        expand(os.path.join(output_folder, "{sample}.phased.vcf"), sample=samples)
+        expand(os.path.join(output_folder, "{sample}.phased.vcf"), sample=samples),
+        expand(os.path.join(output_folder, "{sample}.multiqc.html"), sample=samples)
         
 
 rule fastq2bam:
@@ -148,7 +149,7 @@ rule whatshap:
         '''
 
 
-rule PloidyContaminationQC:
+checkpoint PloidyContaminationQC:
     input: 
         hc_vcf = os.path.join(output_folder, "{sample}.haplotype.caller.vcf.gz"),
         pseudo_diff_vcf = os.path.join(output_folder, f"{reference_prefix}.vs.{pseudo_coords}.difference.vcf") if pseudo_coords is not None else [] 
@@ -307,7 +308,7 @@ rule resolve_conflicts_AltPloidy:
         -v {rep_location}/components:/pipeline/tools/components:ro \
         -v {output_folder}:/pipeline/output \
         -e GID={GID} python_and_whatshap \
-        python3 components/resolve_conflicts/resolve_conflicts.py --hc_vcf /pipeline/input/{wildcards.sample}.alt.ploidy.haplotype.caller.vcf.gz --pileup /pipeline/input/{wildcards.sample}.bcftools.altploidy.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID}
+        python3 components/resolve_conflictsAltPloidy/resolve_conflitcs_alt.py --hc_vcf /pipeline/input/{wildcards.sample}.alt.ploidy.haplotype.caller.vcf.gz --pileup /pipeline/input/{wildcards.sample}.alt.ploidy.bcftools.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID}
         '''
 
 
@@ -328,4 +329,25 @@ rule whatshap_polyphase:
         -v {reference_folder}:/pipeline/reference:ro \
         -e GID={GID} python_and_whatshap \
         bash components/whatshapAltPloidy/whatshap_polyphase.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam  /pipeline/output/{wildcards.sample}.alt.ploidy.conflict.resolved.vcf {threads} 3
+        '''
+
+
+rule multiqc: 
+    threads: int(config['run_settings']['threads'])
+    input:
+        fastp_json = os.path.join(output_folder, "{sample}.json"),
+        regions = os.path.join(output_folder, "{sample}.regions.bed.gz"),
+        thresholds = os.path.join(output_folder, "{sample}.thresholds.bed.gz"),
+        qc_result = os.path.join(output_folder, "{sample}.contamination_ploidy_results.txt"),
+        phased_vcf_alt = lambda wildcards: get_alt_need(wildcards) 
+    output: 
+        multi_qc_report = os.path.join(output_folder, "{sample}.multiqc.html")
+    shell: 
+        '''
+        docker run --rm -v  {output_folder}:/pipeline/input:ro \
+            -v {rep_location}/components:/pipeline/tools/components:ro \
+            -v {output_folder}:/pipeline/output \
+            -v {reference_folder}:/pipeline/reference:ro \
+            -e GID={GID} python_and_whatshap \
+            components/multiqc/multiqc.sh {wildcards.sample} /pipeline/tools/components/multiqc/{multiqc_config}
         '''
