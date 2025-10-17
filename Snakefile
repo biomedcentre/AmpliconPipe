@@ -3,12 +3,16 @@ import os
 configfile: "config.yaml"
 include: "utils.smk"
 
+wildcard_constraints:
+    sample = '\w+'
+
 samples = get_sample_names(input_folder)
 print(samples)
 
+
 rule all: 
     input: 
-        expand(os.path.join(output_folder, "{sample}.contamination_ploidy_results.txt"), sample=samples),
+        expand(os.path.join(output_folder, "{sample}.contamination_ploidy_results_mqc.txt"), sample=samples),
         expand(os.path.join(output_folder, "{sample}.phased.vcf"), sample=samples),
         expand(os.path.join(output_folder, "{sample}.multiqc.html"), sample=samples)
         
@@ -72,7 +76,7 @@ rule mosdepth:
         -v {rep_location}/components:/pipeline/tools/components:ro \
         -v {reference_folder}:/pipeline/reference:ro \
         -v {output_folder}:/pipeline/output \
-        -e GID={GID} gatk \
+        -e GID={GID} mosdepth \
         /pipeline/tools/components/mosdepth/mosdepth.sh /pipeline/input/{wildcards.sample}.sorted.dedup.bam /pipeline/reference/{bed_name} {threads}
         '''
 
@@ -154,7 +158,7 @@ checkpoint PloidyContaminationQC:
         hc_vcf = os.path.join(output_folder, "{sample}.haplotype.caller.vcf.gz"),
         pseudo_diff_vcf = os.path.join(output_folder, f"{reference_prefix}.vs.{pseudo_coords}.difference.vcf") if pseudo_coords is not None else [] 
     output: 
-        qc_result = os.path.join(output_folder, "{sample}.contamination_ploidy_results.txt")
+        qc_result = os.path.join(output_folder, "{sample}.contamination_ploidy_results_mqc.txt")
     shell: 
         '''
         docker run --rm -v  {output_folder}:/pipeline/input:ro \
@@ -261,7 +265,6 @@ rule HaplotypeCallerAltPloidy:
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai"),
         ref_dict = os.path.join(reference_folder, f"{reference_prefix}.dict")
-        # ploidy = 3  might read it from file here
     output:
         hc_vcf_alt = os.path.join(output_folder, "{sample}.alt.ploidy.haplotype.caller.vcf.gz"),
         hc_vcf_alt_tbi = os.path.join(output_folder, "{sample}.alt.ploidy.haplotype.caller.vcf.gz.tbi")
@@ -284,7 +287,6 @@ rule mpileupAltPloidy:
     output: 
         mpileup_alt = os.path.join(output_folder, "{sample}.alt.ploidy.bcftools.vcf.gz"),
         mpileup_alt_tbi = os.path.join(output_folder, "{sample}.alt.ploidy.bcftools.vcf.gz.tbi")
-        # ploidy = 3  might read it from file here
     shell: 
         '''
         docker run --rm -v  {output_folder}:/pipeline/input:ro \
@@ -338,16 +340,15 @@ rule multiqc:
         fastp_json = os.path.join(output_folder, "{sample}.json"),
         regions = os.path.join(output_folder, "{sample}.regions.bed.gz"),
         thresholds = os.path.join(output_folder, "{sample}.thresholds.bed.gz"),
-        qc_result = os.path.join(output_folder, "{sample}.contamination_ploidy_results.txt"),
-        phased_vcf_alt = lambda wildcards: get_alt_need(wildcards) 
+        qc_result = os.path.join(output_folder, "{sample}.contamination_ploidy_results_mqc.txt"),
+        phased_vcf_alt = lambda wildcards: get_alt_need(wildcards, output_folder) 
     output: 
         multi_qc_report = os.path.join(output_folder, "{sample}.multiqc.html")
     shell: 
         '''
-        docker run --rm -v  {output_folder}:/pipeline/input:ro \
+        docker run --rm \
             -v {rep_location}/components:/pipeline/tools/components:ro \
             -v {output_folder}:/pipeline/output \
-            -v {reference_folder}:/pipeline/reference:ro \
             -e GID={GID} python_and_whatshap \
-            components/multiqc/multiqc.sh {wildcards.sample} /pipeline/tools/components/multiqc/{multiqc_config}
+            components/multiqc/multiqc.sh {wildcards.sample} {multiqc_config}
         '''

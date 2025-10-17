@@ -348,7 +348,7 @@ if __name__ == '__main__':
         for i in log_buffer:
             f.write(i + '\n')
 
-    pd.DataFrame(verdict_results, index=[os.path.basename(args.output_prefix)]).to_csv(f'{args.output_prefix}.contamination_ploidy_results.txt', sep='\t')
+    pd.DataFrame(verdict_results, index=[os.path.basename(args.output_prefix)]).to_csv(f'{args.output_prefix}.contamination_ploidy_results_mqc.txt', sep='\t')
 
     subprocess.run(['chown', '-Rc', f':{args.gid}', '/pipeline/output'], capture_output=True, text=True, check=True)
     subprocess.run(['chmod', '-Rc', 'g+w,o-rwx', '/pipeline/output'], capture_output=True, text=True, check=True)

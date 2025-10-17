@@ -1,5 +1,7 @@
 import glob
+import re
 import os
+import logging
 
 # ===variables===
 
@@ -35,7 +37,6 @@ def filename_to_sample(name):
 
     if '_L' in basename:
         # Find position of _L followed by 3 digits and _R1 or _R2
-        import re
         pattern = r'_L\d{3}_R[12]'
         match = re.search(pattern, basename)
         if match:
@@ -52,6 +53,14 @@ def filename_to_sample(name):
     return basename 
 
 
+def find_pattern(name, patterns):
+    for pattern in patterns: 
+        match = re.search(pattern, name)
+        if match:
+            return True
+    return False
+
+
 def get_sample_names(input_folder): 
     '''
     Detects all sample names in input folder 
@@ -63,6 +72,11 @@ def get_sample_names(input_folder):
 
     sample_names = [filename_to_sample(name) for name in all_files]
 
+    # filter sample names for patterns 
+    for p_type in ['include_patterns', 'exclude_patterns']:
+        if len(config['input'][p_type]) > 0: 
+            sample_names = [name for name in sample_names if find_pattern(name, config['input'][p_type])]
+
     # find sample names that have at least 2 fastq 
     sample_counts = {}
     for s in sample_names: 
@@ -70,6 +84,11 @@ def get_sample_names(input_folder):
             sample_counts[s] += 1
         else: 
             sample_counts[s] = 1
+
+    unpaired = [s for s in sample_counts if sample_counts[s] == 1]
+    if len(unpaired) > 0:
+        # TO DO: add proper snakemake warning here 
+        print('WARNING: ', unpaired, ' samples have only one fastq. Unpaired data will not be processed')
 
     final_samples = [s for s in sample_counts if sample_counts[s] > 1]
 
@@ -85,10 +104,11 @@ def get_fastq_input(wildcards, input_folder, rgroup):
     return sorted(all_files)[0]
 
 
-def get_alt_need(wildcards): 
+def get_alt_need(wildcards, output_folder): 
      with checkpoints.PloidyContaminationQC.get(sample=wildcards.sample).output.qc_result.open() as file:
         line = file.readlines()[1].strip('\n').split('\t')
-        if (line[-1] != "[CRITICAL]") & (line[-3] > 2):
-            os.path.join(output_folder, f"{wildcards.sample}.alt.ploidy.phased.vcf")
-        else: 
-            return [] 
+        if (line[-1] != "[CRITICAL]"): 
+            if int(line[-3]) > 2:
+                return os.path.join(output_folder, f"{wildcards.sample}.alt.ploidy.phased.vcf")
+        
+        return []

@@ -1,9 +1,11 @@
 input:
-    input_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/in'
+    input_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/in' # input folder with raw fastq files 
+    include_patterns: []  # list of patterns of sample names to include, e.g. ['CYP21A2', 'SEQ[1,6]']
+    exclude_patterns: [] # list of patterns of sample names to exclude, e.g. ['SAMPLE_1', 'SEQ[2,7]']
     fastq_extensions: ['fastq.gz', 'fq.gz']
-    
+        
 output:
-    output_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/out_4'
+    output_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/out_5'
 
 references: 
     amplicon: '/primary/data/zantysheva/git_clones/AmpliconPipe/reference/CYP21A2_2/CYP21A2-amp_hg38.fasta' # Amplicon fasta .fasta
@@ -14,7 +16,7 @@ references:
 repository: '/primary/data/zantysheva/git_clones/AmpliconPipe'
     
 run_settings:
-    threads: 20
+    threads: 15
 
 user_settings:
     GID: 2009

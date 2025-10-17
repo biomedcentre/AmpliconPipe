@@ -278,6 +278,7 @@ def form_final_vcf(resolved, vcfs):
             vcf_in_pos_line = vcfs[caller_type][vcfs[caller_type]['POS'] == pos].iloc[0]
 
             if len(vcf_in_pos_line['ALT'].split(',')) == len(tab): 
+                # if all alts classified as from this caller, no changes in line are required 
                 new_genotype, quality_source = vcf_in_pos_line['GT'], '/'.join([caller_type] * len(vcf_in_pos_line['GT'].split('/')))
             else: 
                 # generate new genotype and replace old one; not removing alt alleles for now; might be removing if needed in future 
