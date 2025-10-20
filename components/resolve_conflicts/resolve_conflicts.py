@@ -339,10 +339,11 @@ def form_comments_for_final_vcf(vcf_comments):
     vcf_col_names = vcf_comments['hc'][-1] 
 
     for caller_type in ['dv', 'pileup']: 
-        for line in vcf_comments[caller_type][:-1]: 
-            line_start = line.split(',')[0]
-            if not any([i.startswith(line_start) for i in comments]):
-                comments.append(line)
+        if caller_type in vcf_comments.keys():
+            for line in vcf_comments[caller_type][:-1]: 
+                line_start = line.split(',')[0]
+                if not any([i.startswith(line_start) for i in comments]):
+                    comments.append(line)
     comments.append(vcf_col_names)
 
     return comments 

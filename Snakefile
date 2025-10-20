@@ -279,45 +279,25 @@ rule HaplotypeCallerAltPloidy:
         '''
 
 
-rule mpileupAltPloidy: 
-    threads: int(config['run_settings']['threads'])
-    input:
-        bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
-        bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
-    output: 
-        mpileup_alt = os.path.join(output_folder, "{sample}.alt.ploidy.bcftools.vcf.gz"),
-        mpileup_alt_tbi = os.path.join(output_folder, "{sample}.alt.ploidy.bcftools.vcf.gz.tbi")
-    shell: 
-        '''
-        docker run --rm -v  {output_folder}:/pipeline/input:ro \
-        -v {rep_location}/components:/pipeline/tools/components:ro \
-        -v {reference_folder}:/pipeline/reference:ro \
-        -v {output_folder}:/pipeline/output \
-        -e GID={GID} mpileup \
-        /pipeline/tools/components/mpileupAltPloidy/mpileup_altpl.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam {threads} 3
-        '''
-
-
-rule resolve_conflicts_AltPloidy: 
+rule quality_checked_AltPloidy: 
     input:
         hc_vcf_alt = os.path.join(output_folder, "{sample}.alt.ploidy.haplotype.caller.vcf.gz"),
-        mpileup_alt = os.path.join(output_folder, "{sample}.alt.ploidy.bcftools.vcf.gz")
     output:
-        final_vcf_alt = os.path.join(output_folder, "{sample}.alt.ploidy.conflict.resolved.vcf")
+        final_vcf_alt = os.path.join(output_folder, "{sample}.alt.ploidy.quality.checked.vcf")
     shell: 
         '''
         docker run --rm -v  {output_folder}:/pipeline/input:ro \
         -v {rep_location}/components:/pipeline/tools/components:ro \
         -v {output_folder}:/pipeline/output \
         -e GID={GID} python_and_whatshap \
-        python3 components/resolve_conflictsAltPloidy/resolve_conflitcs_alt.py --hc_vcf /pipeline/input/{wildcards.sample}.alt.ploidy.haplotype.caller.vcf.gz --pileup /pipeline/input/{wildcards.sample}.alt.ploidy.bcftools.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID}
+        python3 components/quality_checked_AltPloidy/quality_checked.py --hc_vcf /pipeline/input/{wildcards.sample}.alt.ploidy.haplotype.caller.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID}
         '''
 
 
 rule whatshap_polyphase: 
     threads: int(config['run_settings']['threads'])
     input: 
-        final_vcf = os.path.join(output_folder, "{sample}.alt.ploidy.conflict.resolved.vcf"),
+        final_vcf = os.path.join(output_folder, "{sample}.alt.ploidy.quality.checked.vcf"),
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
         # ploidy = 3  might read it from file here
@@ -330,7 +310,7 @@ rule whatshap_polyphase:
         -v {output_folder}:/pipeline/output \
         -v {reference_folder}:/pipeline/reference:ro \
         -e GID={GID} python_and_whatshap \
-        bash components/whatshapAltPloidy/whatshap_polyphase.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam  /pipeline/output/{wildcards.sample}.alt.ploidy.conflict.resolved.vcf {threads} 3
+        bash components/whatshapAltPloidy/whatshap_polyphase.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam  /pipeline/output/{wildcards.sample}.alt.ploidy.quality.checked.vcf {threads} 3
         '''
 
 
