@@ -13,7 +13,6 @@ reference_prefix = reference_name.split('.fasta')[0]
 
 pseudo_coords = config['references']['pseudogene_coordinates']
 pseudo_vcf_use = f'--pseudovcf /pipeline/output/{reference_prefix}.vs.{pseudo_coords}.difference.vcf' if pseudo_coords is not None else '' 
-multiqc_config = 'multiqc_config_template_pseudogenic.yaml' if pseudo_coords is not None else 'multiqc_config_template.yaml'
 if config['references']['full_genome']:
     ref_name = os.path.basename(config['references']['full_genome'])
     full_ref_dir = os.path.dirname(config['references']['full_genome'])

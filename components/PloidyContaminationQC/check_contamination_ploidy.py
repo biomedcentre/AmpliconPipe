@@ -185,11 +185,12 @@ def estimate_peak_fits(vaf_vector, log_buffer, prefix, max_ploidy=3, fit_type='A
     # TO DO ADDITIONAL CHECK FOR ABSENCE FOR HETEROZYGOUS FOR PLOIDY 1 MAY BE NEEDED 
     minimal_peak_size = 5
     allowed_std = 3 
+    max_peaks = 4
 
     plot_vaf_vector(vaf_vector, prefix, fit_type) # plotting at this point for now
 
     # choose best GM and filter before merge 
-    best_n, gm = choose_best_gm(vaf_vector)
+    best_n, gm = choose_best_gm(vaf_vector, max_components=min(max_peaks, len(vaf_vector) - 1))
     pred_labels = pd.Series(gm.predict(np.array(vaf_vector).reshape(-1, 1)), index=vaf_vector.index)
     
     peaks_stats = []
@@ -319,6 +320,7 @@ if __name__ == '__main__':
     else: 
         pseudo_vector_in_sample, nonpseudo_vector_in_sample = [], gt_vector
         fit_type = 'All variants' 
+
     
     # do contamination check on all SNP or non-pseudogenic
     log_buffer = []

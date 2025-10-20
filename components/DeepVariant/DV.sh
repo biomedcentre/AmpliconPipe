@@ -1,7 +1,5 @@
 #!/bin/bash
 
-#source "/pipeline/tools/header-settings.sh"
-
 ## ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ##
 ## Command-line arguments
 readonly REF_FASTA="$1"
@@ -21,7 +19,7 @@ readonly GVCF="${OUTPUT_BASENAME}.deepvariant.gvcf"
   --regions="${REGIONS_BED}" \
   --output_vcf="/pipeline/output/${VCF}" \
   --num_shards="${THREADS:-23}" \
-  --logging_dir="/pipeline/output/${OUTPUT_BASENAME}_deep_variant_logs" \
+  --logging_dir="/pipeline/output/${OUTPUT_BASENAME}.deep_variant_logs" \
   --dry_run=false
 
 ## These commands ensure that the output is not saved with root:root ownership.

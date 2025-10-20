@@ -4,7 +4,7 @@ configfile: "config.yaml"
 include: "utils.smk"
 
 wildcard_constraints:
-    sample = '\w+'
+    sample = r'\w+'
 
 samples = get_sample_names(input_folder)
 print(samples)
@@ -330,5 +330,5 @@ rule multiqc:
             -v {rep_location}/components:/pipeline/tools/components:ro \
             -v {output_folder}:/pipeline/output \
             -e GID={GID} python_and_whatshap \
-            components/multiqc/multiqc.sh {wildcards.sample} {multiqc_config}
+            components/multiqc/multiqc.sh {wildcards.sample} 
         '''
