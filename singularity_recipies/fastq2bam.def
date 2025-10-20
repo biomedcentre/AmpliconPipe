@@ -1,0 +1,40 @@
+Bootstrap: docker
+From: debian:bullseye-slim
+
+%arguments
+    BWA_VERSION=2.2.1
+    FASTP_VERSION=0.23.2
+
+%environment
+    export PATH=/pipeline/tools/bwa-mem2:/pipeline/tools:$PATH
+
+%post
+    # Install system packages
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        bzip2 \
+        ca-certificates \
+        curl \
+        samtools && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+    # Create directory structure
+    mkdir -p /pipeline/reference
+    mkdir -p /pipeline/input
+    mkdir -p /pipeline/output
+    mkdir -p /pipeline/tools
+
+    cd /pipeline/tools
+
+    # Install bwa-mem2
+    curl -L https://github.com/bwa-mem2/bwa-mem2/releases/download/v${BWA_VERSION}/bwa-mem2-${BWA_VERSION}_x64-linux.tar.bz2 | tar jxf - && \
+    mv bwa-mem2-${BWA_VERSION}_x64-linux bwa-mem2
+
+    # Install fastp
+    curl --retry 5 --retry-delay 10 --retry-max-time 60 -L http://opengene.org/fastp/fastp.${FASTP_VERSION} > ./fastp && \
+    chmod +x ./fastp
+
+%help
+    Container with bwa-mem2 and fastp tools for bioinformatics pipeline.
+    Includes samtools and basic utilities.

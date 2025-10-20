@@ -1,0 +1,62 @@
+Bootstrap: docker
+From: debian:bullseye-slim
+
+%arguments
+    threads=4
+
+%post
+    # Install build dependencies
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        autoconf \
+        gcc \
+        git \
+        libbz2-dev \
+        libcurl4-gnutls-dev  \
+        liblzma-dev \
+        make \
+        zlib1g-dev && \
+    apt-get install -y --reinstall ca-certificates
+
+    # Clone and build htslib and bcftools
+    git clone --recurse-submodules https://github.com/samtools/htslib.git
+    git clone https://github.com/samtools/bcftools.git
+
+    cd /bcftools
+
+    autoheader && autoconf && ./configure
+    make -j ${threads} && make install
+
+    # Clean up build dependencies and sources to reduce image size
+    apt-get remove -y \
+        autoconf \
+        gcc \
+        git \
+        make && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /htslib /bcftools
+
+    # Install runtime dependencies
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        tabix \
+        libbz2-dev \
+        libcurl4-gnutls-dev \
+        liblzma-dev \
+        zlib1g-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+    # Create directory structure
+    mkdir -p /pipeline/input
+    mkdir -p /pipeline/output
+    mkdir -p /pipeline/tools
+    mkdir -p /pipeline/reference
+
+%environment
+    export WORKDIR=/
+
+%help
+    BCFtools built from source with optimized compilation using ${threads} threads.
+    Includes runtime dependencies and pipeline directory structure.

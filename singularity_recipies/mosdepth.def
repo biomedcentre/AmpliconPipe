@@ -1,0 +1,25 @@
+Bootstrap: docker
+From: alpine:3.15
+
+%arguments
+    MOSDEPTH_VER=0.3.3
+
+%post
+    # Install Alpine packages
+    apk add --no-cache \
+        bash \
+        wget
+
+    # Create directory structure
+    mkdir -p /pipeline/input
+    mkdir -p /pipeline/output
+    mkdir -p /pipeline/tools
+    mkdir -p /pipeline/regions
+
+    # Download and install mosdepth
+    wget https://github.com/brentp/mosdepth/releases/download/v${MOSDEPTH_VER}/mosdepth && \
+    chmod +x /mosdepth
+
+%help
+    Alpine Linux 3.15 with mosdepth ${MOSDEPTH_VER} for depth calculation.
+    Includes bash, wget and pipeline directory structure.

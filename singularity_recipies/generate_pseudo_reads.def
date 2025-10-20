@@ -1,0 +1,36 @@
+Bootstrap: docker
+From: python:3.10-slim
+
+%post
+    # Install system packages
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        bzip2 \
+        ca-certificates \
+        curl \
+        samtools && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+    # Create directory structure
+    mkdir -p /pipeline/reference
+    mkdir -p /pipeline/input
+    mkdir -p /pipeline/output
+    mkdir -p /pipeline/tools
+
+    cd /pipeline/tools
+
+    # Download and install NEAT
+    curl -L https://github.com/ncsa/NEAT/archive/refs/tags/3.4.tar.gz | tar -xzf -
+    pip install -r NEAT-3.4/requirements.txt
+
+%environment
+    export WORKDIR=/pipeline/tools
+
+%runscript
+    cd /pipeline/tools
+    exec /bin/bash "$@"
+
+%help
+    Python 3.10 with NEAT 3.4 and bioinformatics tools.
+    Includes samtools and pipeline directory structure.

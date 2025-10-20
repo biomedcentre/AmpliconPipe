@@ -1,0 +1,35 @@
+Bootstrap: docker
+From: python:3.12-trixie
+
+%files
+    requirements.txt /pipeline/tools/requirements.txt
+
+%post
+    # Install system packages
+    apt-get update && apt-get install -y \
+        ca-certificates \   
+        build-essential \
+        tabix && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+    # Create directory structure
+    mkdir -p /pipeline/input
+    mkdir -p /pipeline/output
+    mkdir -p /pipeline/references
+    mkdir -p /pipeline/tools
+
+    # Upgrade pip and install Python packages
+    pip install --upgrade pip setuptools wheel
+    pip install -r /pipeline/tools/requirements.txt
+
+%environment
+    export WORKDIR=/pipeline/tools
+
+%runscript
+    cd /pipeline/tools
+    exec "$@"
+
+%help
+    Python 3.12 environment with build tools and tabix.
+    Pipeline directory structure included.

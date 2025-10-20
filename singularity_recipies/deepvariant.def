@@ -1,0 +1,21 @@
+Bootstrap: docker
+From: google/deepvariant:1.5.0
+
+%environment
+    export LC_ALL=C
+    export PATH=/opt/deepvariant/bin:$PATH
+
+%post
+    # Create the same directory structure
+    mkdir -p /pipeline/reference
+    mkdir -p /pipeline/input 
+    mkdir -p /pipeline/output
+    mkdir -p /pipeline/tools
+    
+    # Set working directory
+    cd /pipeline/tools
+
+%runscript
+    exec bash "$@"
+%startscript
+    exec /bin/bash "$@"

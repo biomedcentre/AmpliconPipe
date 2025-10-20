@@ -1,0 +1,26 @@
+Bootstrap: docker
+From: broadinstitute/gatk:4.5.0.0
+
+%post
+    # Install parallel utility
+    apt-get update --allow-insecure-repositories && \
+    apt-get install -y --no-install-recommends \
+        parallel && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+    # Create directory structure
+    mkdir -p /pipeline/reference
+    mkdir -p /pipeline/input
+    mkdir -p /pipeline/output
+    mkdir -p /pipeline/tools
+
+%environment
+    export WORKDIR=/pipeline/tools
+
+%runscript
+    cd /pipeline/tools
+    exec "$@"
+
+%help
+    GATK 4.5.0.0 with GNU parallel and pipeline directory structure.
