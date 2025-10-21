@@ -1,10 +1,9 @@
 Bootstrap: docker
 From: alpine:3.15
 
-%arguments
+%post
     MOSDEPTH_VER=0.3.3
 
-%post
     # Install Alpine packages
     apk add --no-cache \
         bash \

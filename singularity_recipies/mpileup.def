@@ -1,10 +1,10 @@
 Bootstrap: docker
 From: debian:bullseye-slim
-
-%arguments
-    threads=4
+    
 
 %post
+    threads=4
+
     # Install build dependencies
     apt-get update && \
     apt-get install -y --no-install-recommends \

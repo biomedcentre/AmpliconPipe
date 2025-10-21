@@ -1,14 +1,14 @@
 Bootstrap: docker
 From: debian:bullseye-slim
-
-%arguments
-    BWA_VERSION=2.2.1
-    FASTP_VERSION=0.23.2
+    
 
 %environment
     export PATH=/pipeline/tools/bwa-mem2:/pipeline/tools:$PATH
 
 %post
+    BWA_VERSION=2.2.1
+    FASTP_VERSION=0.23.2
+
     # Install system packages
     apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -28,7 +28,7 @@ From: debian:bullseye-slim
     cd /pipeline/tools
 
     # Install bwa-mem2
-    curl -L https://github.com/bwa-mem2/bwa-mem2/releases/download/v${BWA_VERSION}/bwa-mem2-${BWA_VERSION}_x64-linux.tar.bz2 | tar jxf - && \
+    curl -L https://github.com/bwa-mem2/bwa-mem2/releases/download/v${BWA_VERSION}/bwa-mem2-${BWA_VERSION}_x64-linux.tar.bz2 | tar jxf - --no-same-owner && \
     mv bwa-mem2-${BWA_VERSION}_x64-linux bwa-mem2
 
     # Install fastp

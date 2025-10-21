@@ -5,23 +5,35 @@ import logging
 
 # ===variables===
 
-rep_location = config['repository']
+# references
+rep_location = os.path.dirname(workflow.snakefile)
 reference_folder = os.path.dirname(config['references']['amplicon'])
 reference_name = os.path.basename(config['references']['amplicon'])
 reference_prefix = reference_name.split('.fasta')[0] 
+bed_name = os.path.basename(config['references']['amplicon_bed'])
 
 
+# options if pseudogene given 
 pseudo_coords = config['references']['pseudogene_coordinates']
 pseudo_vcf_use = f'--pseudovcf /pipeline/output/{reference_prefix}.vs.{pseudo_coords}.difference.vcf' if pseudo_coords is not None else '' 
 if config['references']['full_genome']:
     ref_name = os.path.basename(config['references']['full_genome'])
     full_ref_dir = os.path.dirname(config['references']['full_genome'])
 
-bed_name = os.path.basename(config['references']['amplicon_bed'])
-GID = config['user_settings']['GID']
-output_folder = config['output']['output_folder']
-threads = config['run_settings']['threads']
+
+# input output 
 input_folder = config['input']['input_folder']
+output_folder = config['output']['output_folder']
+
+
+# settings 
+GID = config['user_settings']['GID']
+threads = config['run_settings']['threads']
+
+# container settings 
+container_run_command = 'docker run --rm' if config['run_settings']['engine'] == 'docker' else 'singularity run --writable-tmpfs'
+bind = '-v' if config['run_settings']['engine'] == 'docker' else '-B'
+env = '-e' if config['run_settings']['engine'] == 'docker' else '--env'
 
 
 # ===functions===
@@ -111,3 +123,11 @@ def get_alt_need(wildcards, output_folder):
                 return os.path.join(output_folder, f"{wildcards.sample}.alt.ploidy.phased.vcf")
         
         return []
+
+
+def get_full_container(container_name): 
+
+    if config['run_settings']['engine'] == 'singularity': 
+        return os.path.join(rep_location, 'singularity_images', container_name)
+    else:
+        return container_name
