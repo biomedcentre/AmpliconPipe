@@ -13,10 +13,12 @@ readonly CONTAINER="$6"
 
 readonly prefix=$(basename "${BAM%%.sorted.dedup.bam}")
 
-bgzip "${FINAL_VCF}"
+bgzip "${FINAL_VCF}" -o "${FINAL_VCF}".gz
 tabix "${FINAL_VCF}".gz 
 
-whatshap polyphase "${FINAL_VCF}".gz "${BAM}" -o /pipeline/output/"${prefix}".alt.ploidy.phased.vcf --tag=PS -r "${AMPLICON_REF}" -p "${PLOIDY}" --threads "${THREADS}"
+whatshap polyphase "${FINAL_VCF}".gz "${BAM}" -o /pipeline/output/"${prefix}".alt.ploidy.phased.vcf --tag=PS -r "${AMPLICON_REF}" -p "${PLOIDY}" --threads "${THREADS}" && \
+bgzip /pipeline/output/"${prefix}".alt.ploidy.phased.vcf && \
+tabix /pipeline/output/"${prefix}".alt.ploidy.phased.vcf.gz
 
 ## These commands ensure that the output is not saved with root:root ownership.
 ## GID is group id env variable 

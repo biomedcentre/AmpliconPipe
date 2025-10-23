@@ -27,6 +27,7 @@ output_folder = config['output']['output_folder']
 
 # settings 
 GID = config['user_settings']['GID']
+save_all_callers = config['output']['save_all_callers']
 
 # container settings 
 container_type = config['run_settings']['engine']
@@ -119,7 +120,7 @@ def get_alt_need(wildcards, output_folder):
         line = file.readlines()[1].strip('\n').split('\t')
         if (line[-1] != "[CRITICAL]"): 
             if int(line[-3]) > 2:
-                return os.path.join(output_folder, f"{wildcards.sample}.alt.ploidy.phased.vcf")
+                return os.path.join(output_folder, f"{wildcards.sample}.alt.ploidy.phased.vcf.gz")
         
         return []
 

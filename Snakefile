@@ -13,7 +13,7 @@ print(samples)
 rule all: 
     input: 
         expand(os.path.join(output_folder, "{sample}.contamination_ploidy_results_mqc.txt"), sample=samples),
-        expand(os.path.join(output_folder, "{sample}.phased.vcf"), sample=samples),
+        expand(os.path.join(output_folder, "{sample}.phased.vcf.gz"), sample=samples),
         expand(os.path.join(output_folder, "{sample}.multiqc.html"), sample=samples)
         
 
@@ -36,7 +36,8 @@ rule fastq2bam:
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai"),
         fastp_json = os.path.join(output_folder, "{sample}.json")
     params: 
-        container_name = get_full_container('fastq2bam')
+        container_name = get_full_container('fastq2bam'),
+        directory_for_calling = os.path.join(output_folder, "{sample}.raw.caller.output")
     shell: 
         '''
         {container_run_command} \
@@ -46,6 +47,7 @@ rule fastq2bam:
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
         /pipeline/tools/components/fastq2bam/fastq2bam.sh /pipeline/reference/{reference_name} {input.r1} {input.r2} {threads} {container_type} {wildcards.sample}
+        mkdir -p {params.directory_for_calling}
         '''
 
 
@@ -60,8 +62,8 @@ rule HaplotypeCaller:
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai"),
         ref_dict = os.path.join(reference_folder, f"{reference_prefix}.dict")
     output:
-        hc_vcf = os.path.join(output_folder, "{sample}.haplotype.caller.vcf.gz"),
-        hc_vcf_tbi = os.path.join(output_folder, "{sample}.haplotype.caller.vcf.gz.tbi")
+        hc_vcf = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.haplotype.caller.vcf.gz") if save_all_callers else temp(os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.haplotype.caller.vcf.gz")),
+        hc_vcf_tbi = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.haplotype.caller.vcf.gz.tbi") if save_all_callers else temp(os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.haplotype.caller.vcf.gz.tbi"))
     params: 
         container_name = get_full_container('gatk')
     shell: 
@@ -112,8 +114,8 @@ rule mpileup:
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
     output: 
-        mpileup = os.path.join(output_folder, "{sample}.bcftools.vcf.gz"),
-        mpileup_tbi = os.path.join(output_folder, "{sample}.bcftools.vcf.gz.tbi")
+        mpileup = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.bcftools.vcf.gz") if save_all_callers else temp(os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.bcftools.vcf.gz")),
+        mpileup_tbi = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.bcftools.vcf.gz.tbi") if save_all_callers else temp(os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.bcftools.vcf.gz.tbi"))
     params: 
         container_name = get_full_container('mpileup')
     shell: 
@@ -138,7 +140,7 @@ rule DeepVariant:
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
     output: 
-        dv_vcf = os.path.join(output_folder, "{sample}.deepvariant.vcf")
+        dv_vcf = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.deepvariant.vcf") if save_all_callers else temp(os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.deepvariant.vcf"))
     params: 
         container_name = get_full_container('deepvariant')
     shell: 
@@ -160,13 +162,14 @@ rule resolve_conflicts:
         mem_mb =  int(config['rules_settings']['resolve_conflicts']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['resolve_conflicts']['cpus_per_task'])
     input:
-        hc_vcf = os.path.join(output_folder, "{sample}.haplotype.caller.vcf.gz"),
-        mpileup = os.path.join(output_folder, "{sample}.bcftools.vcf.gz"),
-        dv_vcf = os.path.join(output_folder, "{sample}.deepvariant.vcf")
+        hc_vcf = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.haplotype.caller.vcf.gz"),
+        mpileup = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.bcftools.vcf.gz"),
+        dv_vcf = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.deepvariant.vcf")
     output:
-        final_vcf = os.path.join(output_folder, "{sample}.conflict.resolved.vcf")
+        final_vcf = temp(os.path.join(output_folder, "{sample}.conflict.resolved.vcf"))
     params: 
-        container_name = get_full_container('python_and_whatshap')
+        container_name = get_full_container('python_and_whatshap'),
+        input_prefix_in_container = "/pipeline/input/{sample}.raw.caller.output/{sample}"
     shell: 
         '''
         {container_run_command} \
@@ -174,7 +177,7 @@ rule resolve_conflicts:
         {bind} {rep_location}/components:/pipeline/tools/components:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
-        python3 /pipeline/tools/components/resolve_conflicts/resolve_conflicts.py --hc_vcf /pipeline/input/{wildcards.sample}.haplotype.caller.vcf.gz --dv_vcf /pipeline/input/{wildcards.sample}.deepvariant.vcf --pileup /pipeline/input/{wildcards.sample}.bcftools.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID} --container {container_type}
+        python3 /pipeline/tools/components/resolve_conflicts/resolve_conflicts.py --hc_vcf {params.input_prefix_in_container}.haplotype.caller.vcf.gz --dv_vcf {params.input_prefix_in_container}.deepvariant.vcf --pileup {params.input_prefix_in_container}.bcftools.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID} --container {container_type}
         '''
 
 
@@ -189,7 +192,8 @@ rule whatshap:
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
     output:
-        phased_vcf = os.path.join(output_folder, "{sample}.phased.vcf")
+        phased_vcf = os.path.join(output_folder, "{sample}.phased.vcf.gz"),
+        phased_vcf_tbi = os.path.join(output_folder, "{sample}.phased.vcf.gz.tbi")
     params: 
         container_name = get_full_container('python_and_whatshap')
     shell: 
@@ -211,7 +215,7 @@ checkpoint PloidyContaminationQC:
         mem_mb =  int(config['rules_settings']['PloidyContaminationQC']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['PloidyContaminationQC']['cpus_per_task'])
     input: 
-        hc_vcf = os.path.join(output_folder, "{sample}.haplotype.caller.vcf.gz"),
+        hc_vcf = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.haplotype.caller.vcf.gz"),
         pseudo_diff_vcf = os.path.join(output_folder, f"{reference_prefix}.vs.{pseudo_coords}.difference.vcf") if pseudo_coords is not None else [] 
     output: 
         qc_result = os.path.join(output_folder, "{sample}.contamination_ploidy_results_mqc.txt")
@@ -224,7 +228,7 @@ checkpoint PloidyContaminationQC:
         {bind} {rep_location}/components:/pipeline/tools/components:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
-        python3 /pipeline/tools/components/PloidyContaminationQC/check_contamination_ploidy.py --hc_vcf /pipeline/input/{wildcards.sample}.haplotype.caller.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID} {pseudo_vcf_use} --container {container_type}
+        python3 /pipeline/tools/components/PloidyContaminationQC/check_contamination_ploidy.py --hc_vcf /pipeline/input/{wildcards.sample}.raw.caller.output/{wildcards.sample}.haplotype.caller.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID} {pseudo_vcf_use} --container {container_type}
         '''
 
 
@@ -365,8 +369,8 @@ rule HaplotypeCallerAltPloidy:
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai"),
         ref_dict = os.path.join(reference_folder, f"{reference_prefix}.dict")
     output:
-        hc_vcf_alt = os.path.join(output_folder, "{sample}.alt.ploidy.haplotype.caller.vcf.gz"),
-        hc_vcf_alt_tbi = os.path.join(output_folder, "{sample}.alt.ploidy.haplotype.caller.vcf.gz.tbi")
+        hc_vcf_alt = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.alt.ploidy.haplotype.caller.vcf.gz") if save_all_callers else temp(os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.alt.ploidy.haplotype.caller.vcf.gz")),
+        hc_vcf_alt_tbi = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.alt.ploidy.haplotype.caller.vcf.gz.tbi") if save_all_callers else temp(os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.alt.ploidy.haplotype.caller.vcf.gz.tbi"))
     params: 
         container_name = get_full_container('gatk')
     shell: 
@@ -388,9 +392,9 @@ rule quality_checked_AltPloidy:
         mem_mb =  int(config['rules_settings']['quality_checked_AltPloidy']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['quality_checked_AltPloidy']['cpus_per_task'])
     input:
-        hc_vcf_alt = os.path.join(output_folder, "{sample}.alt.ploidy.haplotype.caller.vcf.gz"),
+        hc_vcf_alt = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.alt.ploidy.haplotype.caller.vcf.gz"),
     output:
-        final_vcf_alt = os.path.join(output_folder, "{sample}.alt.ploidy.quality.checked.vcf")
+        final_vcf_alt = temp(os.path.join(output_folder, "{sample}.alt.ploidy.quality.checked.vcf"))
     params: 
         container_name = get_full_container('python_and_whatshap')
     shell: 
@@ -400,7 +404,7 @@ rule quality_checked_AltPloidy:
         {bind} {rep_location}/components:/pipeline/tools/components:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
-        python3 /pipeline/tools/components/quality_checked_AltPloidy/quality_checked.py --hc_vcf /pipeline/input/{wildcards.sample}.alt.ploidy.haplotype.caller.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID} --container {container_type}
+        python3 /pipeline/tools/components/quality_checked_AltPloidy/quality_checked.py --hc_vcf /pipeline/input/{wildcards.sample}.raw.caller.output/{wildcards.sample}.alt.ploidy.haplotype.caller.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID} --container {container_type}
         '''
 
 
@@ -416,7 +420,8 @@ rule whatshap_polyphase:
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
         # ploidy = 3  might read it from file here
     output:
-        phased_vcf_alt = os.path.join(output_folder, "{sample}.alt.ploidy.phased.vcf")
+        phased_vcf_alt = os.path.join(output_folder, "{sample}.alt.ploidy.phased.vcf.gz"),
+        phased_vcf_alt_tbi = os.path.join(output_folder, "{sample}.alt.ploidy.phased.vcf.gz.tbi")
     params: 
         container_name = get_full_container('python_and_whatshap')
     shell: 
@@ -442,11 +447,12 @@ rule multiqc:
         regions = os.path.join(output_folder, "{sample}.regions.bed.gz"),
         thresholds = os.path.join(output_folder, "{sample}.thresholds.bed.gz"),
         qc_result = os.path.join(output_folder, "{sample}.contamination_ploidy_results_mqc.txt"),
-        phased_vcf_alt = lambda wildcards: get_alt_need(wildcards, output_folder) 
+        phased_vcf_alt = lambda wildcards: get_alt_need(wildcards, output_folder)
     output: 
         multi_qc_report = os.path.join(output_folder, "{sample}.multiqc.html")
     params: 
-        container_name = get_full_container('python_and_whatshap')
+        container_name = get_full_container('python_and_whatshap'),
+        directory_for_calling = os.path.join(output_folder, "{sample}.raw.caller.output")
     shell: 
         '''
         {container_run_command} \
@@ -454,4 +460,8 @@ rule multiqc:
             {bind} {output_folder}:/pipeline/output \
             {env} GID={GID} {params.container_name} \
             /pipeline/tools/components/multiqc/multiqc.sh {wildcards.sample} {container_type}
+
+        if [ {save_all_callers} = 'False' ]; then
+            rm -rd {params.directory_for_calling}
+        fi 
         '''

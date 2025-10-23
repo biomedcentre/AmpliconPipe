@@ -10,7 +10,7 @@ readonly THREADS=$3
 readonly CONTAINER="$4"
 
 readonly prefix=$(basename "${INPUT_BAM%%.sorted.dedup.bam}")
-readonly output="/pipeline/output/${prefix}"
+readonly output="/pipeline/output/${prefix}.raw.caller.output/${prefix}"
 
 bcftools mpileup --threads "${THREADS}" -f "${AMPLICON_REF}" -L 20000 -a FORMAT/AD,FORMAT/DP --no-BAQ -d 3000 -Ou "${INPUT_BAM}" | \
 bcftools call -mv -Oz -o "${output}".bcftools.vcf.gz

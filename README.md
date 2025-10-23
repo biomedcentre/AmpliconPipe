@@ -15,5 +15,5 @@ id -g
 ```
 To launch 
 ```
-snakemake -p --cores 15 --default-resources tmpdir="/your/folder/tmp"
+snakemake -p --cores 45 --default-resources "tmpdir='/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/tmp'"
 ```

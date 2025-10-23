@@ -8,9 +8,9 @@ input:
 
 # ===== OUTPUT SETTINGS ====         
 output:
-    output_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/out_6'
-    save_all_callers: True
-    # this flag is used to mark if all callers outputs should be preserved, or only conflic resolved output should be saved 
+    output_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/out_7'
+    save_all_callers: False
+    # this flag is used to mark if all callers outputs should be preserved, or only conflict resolved output should be saved 
 
 # ===== REFERENCE SETTINGS ====  
 

@@ -11,7 +11,7 @@ readonly PLOIDY=$4
 readonly CONTAINER="$5"
 
 readonly prefix=$(basename "${INPUT_BAM%%.sorted.dedup.bam}")
-readonly output="/pipeline/output/${prefix}"
+readonly output="/pipeline/output/${prefix}.raw.caller.output/${prefix}"
 
 gatk HaplotypeCaller -R "${AMPLICON_REF}" -I "${INPUT_BAM}" -O "${output}".alt.ploidy.haplotype.caller.vcf.gz --native-pair-hmm-threads "${THREADS}" -ploidy "${PLOIDY}" --verbosity WARNING
 

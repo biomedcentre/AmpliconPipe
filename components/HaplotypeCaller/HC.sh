@@ -10,7 +10,7 @@ readonly THREADS=$3
 readonly CONTAINER="$4"
 
 readonly prefix=$(basename "${INPUT_BAM%%.sorted.dedup.bam}")
-readonly output="/pipeline/output/${prefix}"
+readonly output="/pipeline/output/${prefix}.raw.caller.output/${prefix}"
 
 gatk HaplotypeCaller -R "${AMPLICON_REF}" -I "${INPUT_BAM}" -O "${output}".haplotype.caller.vcf.gz --native-pair-hmm-threads "${THREADS}" --verbosity WARNING
 
