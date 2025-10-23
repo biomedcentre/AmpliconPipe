@@ -9,13 +9,8 @@ readonly REF_PREFIX="$1"
 readonly FASTQ_R1="$2"
 readonly FASTQ_R2="$3"
 readonly THREADS="$4"
-
-readonly filename=$(basename "${FASTQ_R1%%.fastq.gz}")
-sample_name="${filename%_L[0-9][0-9][0-9]_R[12]*}"
-if [ "$sample_name" = "$filename" ]; then
-    # If no lanes, try remove R group pattern only 
-    sample_name="${filename%_R[12]*}"
-fi
+readonly CONTAINER="$5"
+readonly sample_name="$6" #snakemake sample wildcard
 
 readonly OUTPUT_FASTP="/pipeline/output/${sample_name}.json"
 readonly OUTPUT_BAM="/pipeline/output/${sample_name}.sorted.dedup.bam"
@@ -26,7 +21,7 @@ readonly OUTPUT_BAM="/pipeline/output/${sample_name}.sorted.dedup.bam"
       --thread "${THREADS}" \
       --json="${OUTPUT_FASTP}" \
       --stdout \
-    | bwa-mem2/bwa-mem2 mem \
+    | /pipeline/tools/bwa-mem2/bwa-mem2 mem \
       -p \
       -t "${THREADS}" \
       "${REF_PREFIX}" \
@@ -55,7 +50,9 @@ samtools index \
     -@ "${THREADS}" \
     "${OUTPUT_BAM}"
 
-## These commands ensure that the output is not saved with root:root ownership.
+## These commands ensure that the output is not saved with root:root ownership in docker 
 ## GID is group id env variable 
-chown -Rc :"${GID:-0}" /pipeline/output
+if [ "${CONTAINER}" = 'docker' ]; then
+    chown -Rc :"${GID:-0}" /pipeline/output
+fi 
 chmod -Rc g+w,o-rwx /pipeline/output

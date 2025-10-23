@@ -35,6 +35,10 @@ From: debian:bullseye-slim
     curl --retry 5 --retry-delay 10 --retry-max-time 60 -L http://opengene.org/fastp/fastp.${FASTP_VERSION} > ./fastp && \
     chmod +x ./fastp
 
+%runscript
+    cd /pipeline/tools
+    exec /bin/bash "$@"
+
 %help
     Container with bwa-mem2 and fastp tools for bioinformatics pipeline.
     Includes samtools and basic utilities.

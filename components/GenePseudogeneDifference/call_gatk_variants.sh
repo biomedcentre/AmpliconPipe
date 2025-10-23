@@ -4,12 +4,13 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-while getopts 'p:P:j:a:' flag
+while getopts 'P:j:a:c:' flag
 do
     case "${flag}" in
         P) PSEUDO_COORDS=${OPTARG};;
         j) THREADS=${OPTARG};;
         a) AMPLICON_REF=${OPTARG};;
+        c) CONTAINER=${OPTARG};;
     esac
 done
 
@@ -37,5 +38,7 @@ rm /pipeline/output/"${PSEUDO_COORDS}".pseudoalign.replacerg.bam /pipeline/outpu
 
 ## These commands ensure that the output is not saved with root:root ownership.
 ## GID is group id env variable 
-chown -Rc :"${GID:-0}" /pipeline/output
+if [ "${CONTAINER}" = 'docker' ]; then
+    chown -Rc :"${GID:-0}" /pipeline/output
+fi 
 chmod -Rc g+w,o-rwx /pipeline/output

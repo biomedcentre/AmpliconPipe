@@ -1,7 +1,6 @@
 import glob
 import re
 import os
-import logging
 
 # ===variables===
 
@@ -28,9 +27,9 @@ output_folder = config['output']['output_folder']
 
 # settings 
 GID = config['user_settings']['GID']
-threads = config['run_settings']['threads']
 
 # container settings 
+container_type = config['run_settings']['engine']
 container_run_command = 'docker run --rm' if config['run_settings']['engine'] == 'docker' else 'singularity run --writable-tmpfs'
 bind = '-v' if config['run_settings']['engine'] == 'docker' else '-B'
 env = '-e' if config['run_settings']['engine'] == 'docker' else '--env'
@@ -128,6 +127,6 @@ def get_alt_need(wildcards, output_folder):
 def get_full_container(container_name): 
 
     if config['run_settings']['engine'] == 'singularity': 
-        return os.path.join(rep_location, 'singularity_images', container_name)
+        return os.path.join(rep_location, 'singularity_images', f'{container_name}.sif')
     else:
         return container_name

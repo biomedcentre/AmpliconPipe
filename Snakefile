@@ -18,11 +18,11 @@ rule all:
         
 
 rule fastq2bam:
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['fastq2bam']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task =  int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['fastq2bam']['runtime']),
+        mem_mb =  int(config['rules_settings']['fastq2bam']['mem_mb']),
+        cpus_per_task =  int(config['rules_settings']['fastq2bam']['cpus_per_task'])
     input: 
         r1 = lambda wildcards: get_fastq_input(wildcards, input_folder, 'R1'),
         r2 = lambda wildcards: get_fastq_input(wildcards, input_folder, 'R2'),
@@ -45,17 +45,16 @@ rule fastq2bam:
         {bind} {reference_folder}:/pipeline/reference:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
-        components/fastq2bam/fastq2bam.sh /pipeline/reference/{reference_name} {input.r1} {input.r2} {threads}
+        /pipeline/tools/components/fastq2bam/fastq2bam.sh /pipeline/reference/{reference_name} {input.r1} {input.r2} {threads} {container_type} {wildcards.sample}
         '''
 
 
 rule HaplotypeCaller: 
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['HaplotypeCaller']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
-    threads: int(config['run_settings']['threads'])
+        runtime =  int(config['rules_settings']['HaplotypeCaller']['runtime']),
+        mem_mb =  int(config['rules_settings']['HaplotypeCaller']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['HaplotypeCaller']['cpus_per_task'])
     input: 
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai"),
@@ -68,21 +67,21 @@ rule HaplotypeCaller:
     shell: 
         '''
         {container_run_command} \
-        {bind {output_folder}:/pipeline/input:ro \
+        {bind} {output_folder}:/pipeline/input:ro \
         {bind} {rep_location}/components:/pipeline/tools/components:ro \
         {bind} {reference_folder}:/pipeline/reference:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
-        components/HaplotypeCaller/HC.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam {threads}
+        /pipeline/tools/components/HaplotypeCaller/HC.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam {threads} {container_type}
         '''
 
 
 rule mosdepth:
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['mosdepth']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['mosdepth']['runtime']),
+        mem_mb =  int(config['rules_settings']['mosdepth']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['mosdepth']['cpus_per_task'])
     input:
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
@@ -99,16 +98,16 @@ rule mosdepth:
         {bind} {reference_folder}:/pipeline/reference:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
-        /pipeline/tools/components/mosdepth/mosdepth.sh /pipeline/input/{wildcards.sample}.sorted.dedup.bam /pipeline/reference/{bed_name} {threads}
+        /pipeline/tools/components/mosdepth/mosdepth.sh /pipeline/input/{wildcards.sample}.sorted.dedup.bam /pipeline/reference/{bed_name} {threads} {container_type}
         '''
 
 
 rule mpileup: 
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['mpileup']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['mpileup']['runtime']),
+        mem_mb =  int(config['rules_settings']['mpileup']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['mpileup']['cpus_per_task'])
     input:
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
@@ -125,16 +124,16 @@ rule mpileup:
         {bind} {reference_folder}:/pipeline/reference:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
-        /pipeline/tools/components/mpileup/mpileup.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam {threads}
+        /pipeline/tools/components/mpileup/mpileup.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam {threads} {container_type}
         '''
 
 
 rule DeepVariant:
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['DeepVariant']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['DeepVariant']['runtime']),
+        mem_mb =  int(config['rules_settings']['DeepVariant']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['DeepVariant']['cpus_per_task'])
     input:
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
@@ -150,16 +149,16 @@ rule DeepVariant:
         {bind} {reference_folder}:/pipeline/reference:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {env} THREADS={threads} {params.container_name} \
-        /pipeline/tools/components/DeepVariant/DV.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam /pipeline/reference/{bed_name}
+        /pipeline/tools/components/DeepVariant/DV.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam /pipeline/reference/{bed_name} {container_type}
         '''
 
 
 rule resolve_conflicts: 
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['resolve_conflicts']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['resolve_conflicts']['runtime']),
+        mem_mb =  int(config['rules_settings']['resolve_conflicts']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['resolve_conflicts']['cpus_per_task'])
     input:
         hc_vcf = os.path.join(output_folder, "{sample}.haplotype.caller.vcf.gz"),
         mpileup = os.path.join(output_folder, "{sample}.bcftools.vcf.gz"),
@@ -175,16 +174,16 @@ rule resolve_conflicts:
         {bind} {rep_location}/components:/pipeline/tools/components:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
-        python3 components/resolve_conflicts/resolve_conflicts.py --hc_vcf /pipeline/input/{wildcards.sample}.haplotype.caller.vcf.gz --dv_vcf /pipeline/input/{wildcards.sample}.deepvariant.vcf --pileup /pipeline/input/{wildcards.sample}.bcftools.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID}
+        python3 /pipeline/tools/components/resolve_conflicts/resolve_conflicts.py --hc_vcf /pipeline/input/{wildcards.sample}.haplotype.caller.vcf.gz --dv_vcf /pipeline/input/{wildcards.sample}.deepvariant.vcf --pileup /pipeline/input/{wildcards.sample}.bcftools.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID} --container {container_type}
         '''
 
 
 rule whatshap: 
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['whatshap']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['whatshap']['runtime']),
+        mem_mb =  int(config['rules_settings']['whatshap']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['whatshap']['cpus_per_task'])
     input: 
         final_vcf = os.path.join(output_folder, "{sample}.conflict.resolved.vcf"),
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
@@ -201,16 +200,16 @@ rule whatshap:
         {bind} {output_folder}:/pipeline/output \
         {bind} {reference_folder}:/pipeline/reference:ro \
         {env} GID={GID} {params.container_name} \
-        bash components/whatshap/whatshap.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam  /pipeline/output/{wildcards.sample}.conflict.resolved.vcf
+        bash /pipeline/tools/components/whatshap/whatshap.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam  /pipeline/output/{wildcards.sample}.conflict.resolved.vcf {container_type}
         '''
 
 
 checkpoint PloidyContaminationQC:
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['PloidyContaminationQC']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['PloidyContaminationQC']['runtime']),
+        mem_mb =  int(config['rules_settings']['PloidyContaminationQC']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['PloidyContaminationQC']['cpus_per_task'])
     input: 
         hc_vcf = os.path.join(output_folder, "{sample}.haplotype.caller.vcf.gz"),
         pseudo_diff_vcf = os.path.join(output_folder, f"{reference_prefix}.vs.{pseudo_coords}.difference.vcf") if pseudo_coords is not None else [] 
@@ -225,16 +224,16 @@ checkpoint PloidyContaminationQC:
         {bind} {rep_location}/components:/pipeline/tools/components:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
-        python3 components/PloidyContaminationQC/check_contamination_ploidy.py --hc_vcf /pipeline/input/{wildcards.sample}.haplotype.caller.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID} {pseudo_vcf_use}
+        python3 /pipeline/tools/components/PloidyContaminationQC/check_contamination_ploidy.py --hc_vcf /pipeline/input/{wildcards.sample}.haplotype.caller.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID} {pseudo_vcf_use} --container {container_type}
         '''
 
 
 rule index_reference: 
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['index_reference']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['index_reference']['runtime']),
+        mem_mb =  int(config['rules_settings']['index_reference']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['index_reference']['cpus_per_task'])
     input:
         ancient(config['references']['amplicon'])
     output: 
@@ -251,16 +250,16 @@ rule index_reference:
         {bind} {reference_folder}:/pipeline/reference \
         {bind} {rep_location}/components:/pipeline/tools/components:ro \
         {env} GID={GID} {params.container_name} \
-        components/index_bwa/index.sh /pipeline/reference/{reference_name} 
+        /pipeline/tools/components/index_bwa/index.sh /pipeline/reference/{reference_name} {container_type}
         '''
 
 
 rule gatk_dict:
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['gatk_dict']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['gatk_dict']['runtime']),
+        mem_mb =  int(config['rules_settings']['gatk_dict']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['gatk_dict']['cpus_per_task'])
     input:
         ancient(config['references']['amplicon'])
     output: 
@@ -273,16 +272,16 @@ rule gatk_dict:
         {bind} {reference_folder}:/pipeline/reference \
         {bind} {rep_location}/components:/pipeline/tools/components:ro \
         {env} GID={GID} {params.container_name} \
-        components/gatk_dict/gatk_dict.sh /pipeline/reference/{reference_name} /pipeline/reference/{reference_prefix}.dict
+        /pipeline/tools/components/gatk_dict/gatk_dict.sh /pipeline/reference/{reference_name} /pipeline/reference/{reference_prefix}.dict {container_type}
         '''
 
 
 rule pseudogenic_synth_reads: 
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['pseudogenic_synth_reads']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['pseudogenic_synth_reads']['runtime']),
+        mem_mb =  int(config['rules_settings']['pseudogenic_synth_reads']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['pseudogenic_synth_reads']['cpus_per_task'])
     output: 
         temp(os.path.join(output_folder, f"{pseudo_coords}.temp.pseudo_read1.fq.gz")),
         temp(os.path.join(output_folder, f"{pseudo_coords}.temp.pseudo_read2.fq.gz"))
@@ -295,17 +294,17 @@ rule pseudogenic_synth_reads:
         {bind} {rep_location}/components:/pipeline/tools/components:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID=2009 {params.container_name} \
-        components/GenePseudogeneDifference/generate_pseudo_reads_fastq.sh -P {pseudo_coords} \
-        -R /pipeline/input/{ref_name} -j {threads}
+        /pipeline/tools/components/GenePseudogeneDifference/generate_pseudo_reads_fastq.sh -P {pseudo_coords} \
+        -R /pipeline/input/{ref_name} -j {threads} -c {container_type}
         '''
 
 
 rule generate_pseudo_synth_bam: 
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['generate_pseudo_synth_bam']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['generate_pseudo_synth_bam']['runtime']),
+        mem_mb =  int(config['rules_settings']['generate_pseudo_synth_bam']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['generate_pseudo_synth_bam']['cpus_per_task'])
     input: 
         pseudo_r1 = os.path.join(output_folder, f"{pseudo_coords}.temp.pseudo_read1.fq.gz"),
         pseudo_r2 = os.path.join(output_folder, f"{pseudo_coords}.temp.pseudo_read2.fq.gz"),
@@ -326,22 +325,22 @@ rule generate_pseudo_synth_bam:
         {bind} {reference_folder}:/pipeline/reference:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
-        components/GenePseudogeneDifference/generate_pseudo_bam.sh -P {pseudo_coords} -j {threads} -a /pipeline/reference/{reference_name}
+        /pipeline/tools/components/GenePseudogeneDifference/generate_pseudo_bam.sh -P {pseudo_coords} -j {threads} -a /pipeline/reference/{reference_name} -c {container_type}
         '''
 
 
 rule call_variants_different_in_gene: 
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['call_variants_different_in_gene']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['call_variants_different_in_gene']['runtime']),
+        mem_mb =  int(config['rules_settings']['call_variants_different_in_gene']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['call_variants_different_in_gene']['cpus_per_task'])
     input:
         temp_bam = os.path.join(output_folder, f"{pseudo_coords}.pseudoalign.bam"), 
         ref_dict = os.path.join(reference_folder, f"{reference_prefix}.dict")
     output:
         pseudo_diff_vcf = os.path.join(output_folder, f"{reference_prefix}.vs.{pseudo_coords}.difference.vcf") 
-   params: 
+    params: 
         container_name = get_full_container('gatk')
     shell: 
         '''
@@ -351,16 +350,16 @@ rule call_variants_different_in_gene:
         {bind} {reference_folder}:/pipeline/reference:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
-        components/GenePseudogeneDifference/call_gatk_variants.sh -P {pseudo_coords} -j {threads} -a /pipeline/reference/{reference_name} 
+        /pipeline/tools/components/GenePseudogeneDifference/call_gatk_variants.sh -P {pseudo_coords} -j {threads} -a /pipeline/reference/{reference_name} -c {container_type}
         '''
 
 
 rule HaplotypeCallerAltPloidy: 
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['HaplotypeCallerAltPloidy']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['HaplotypeCallerAltPloidy']['runtime']),
+        mem_mb =  int(config['rules_settings']['HaplotypeCallerAltPloidy']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['HaplotypeCallerAltPloidy']['cpus_per_task'])
     input: 
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai"),
@@ -368,7 +367,7 @@ rule HaplotypeCallerAltPloidy:
     output:
         hc_vcf_alt = os.path.join(output_folder, "{sample}.alt.ploidy.haplotype.caller.vcf.gz"),
         hc_vcf_alt_tbi = os.path.join(output_folder, "{sample}.alt.ploidy.haplotype.caller.vcf.gz.tbi")
-   params: 
+    params: 
         container_name = get_full_container('gatk')
     shell: 
         '''
@@ -378,16 +377,16 @@ rule HaplotypeCallerAltPloidy:
         {bind} {reference_folder}:/pipeline/reference:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
-        components/HaplotypeCallerAltPloidy/HC_alt.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam {threads} 3
+        /pipeline/tools/components/HaplotypeCallerAltPloidy/HC_alt.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam {threads} 3 {container_type}
         '''
 
 
 rule quality_checked_AltPloidy: 
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['quality_checked_AltPloidy']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['quality_checked_AltPloidy']['runtime']),
+        mem_mb =  int(config['rules_settings']['quality_checked_AltPloidy']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['quality_checked_AltPloidy']['cpus_per_task'])
     input:
         hc_vcf_alt = os.path.join(output_folder, "{sample}.alt.ploidy.haplotype.caller.vcf.gz"),
     output:
@@ -401,16 +400,16 @@ rule quality_checked_AltPloidy:
         {bind} {rep_location}/components:/pipeline/tools/components:ro \
         {bind} {output_folder}:/pipeline/output \
         {env} GID={GID} {params.container_name} \
-        python3 components/quality_checked_AltPloidy/quality_checked.py --hc_vcf /pipeline/input/{wildcards.sample}.alt.ploidy.haplotype.caller.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID}
+        python3 /pipeline/tools/components/quality_checked_AltPloidy/quality_checked.py --hc_vcf /pipeline/input/{wildcards.sample}.alt.ploidy.haplotype.caller.vcf.gz --output_prefix /pipeline/output/{wildcards.sample} --gid {GID} --container {container_type}
         '''
 
 
 rule whatshap_polyphase: 
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['whatshap_polyphase']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['whatshap_polyphase']['runtime']),
+        mem_mb =  int(config['rules_settings']['whatshap_polyphase']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['whatshap_polyphase']['cpus_per_task'])
     input: 
         final_vcf = os.path.join(output_folder, "{sample}.alt.ploidy.quality.checked.vcf"),
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
@@ -428,16 +427,16 @@ rule whatshap_polyphase:
         {bind} {output_folder}:/pipeline/output \
         {bind} {reference_folder}:/pipeline/reference:ro \
         {env} GID={GID} {params.container_name} \
-        bash components/whatshapAltPloidy/whatshap_polyphase.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam  /pipeline/output/{wildcards.sample}.alt.ploidy.quality.checked.vcf {threads} 3
+        bash /pipeline/tools/components/whatshapAltPloidy/whatshap_polyphase.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam  /pipeline/output/{wildcards.sample}.alt.ploidy.quality.checked.vcf {threads} 3 --container {container_type}
         '''
 
 
 rule multiqc: 
-    threads: int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+    threads: int(config['rules_settings']['multiqc']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings'][workflow.current_rule.name]['runtime']),
-        mem_mb =  int(config['rules_settings'][workflow.current_rule.name]['mem_mb']),
-        cpus_per_task = int(config['rules_settings'][workflow.current_rule.name]['cpus_per_task'])
+        runtime =  int(config['rules_settings']['multiqc']['runtime']),
+        mem_mb =  int(config['rules_settings']['multiqc']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['multiqc']['cpus_per_task'])
     input:
         fastp_json = os.path.join(output_folder, "{sample}.json"),
         regions = os.path.join(output_folder, "{sample}.regions.bed.gz"),
@@ -446,7 +445,7 @@ rule multiqc:
         phased_vcf_alt = lambda wildcards: get_alt_need(wildcards, output_folder) 
     output: 
         multi_qc_report = os.path.join(output_folder, "{sample}.multiqc.html")
-   params: 
+    params: 
         container_name = get_full_container('python_and_whatshap')
     shell: 
         '''
@@ -454,5 +453,5 @@ rule multiqc:
             {bind} {rep_location}/components:/pipeline/tools/components:ro \
             {bind} {output_folder}:/pipeline/output \
             {env} GID={GID} {params.container_name} \
-            components/multiqc/multiqc.sh {wildcards.sample} 
+            /pipeline/tools/components/multiqc/multiqc.sh {wildcards.sample} {container_type}
         '''

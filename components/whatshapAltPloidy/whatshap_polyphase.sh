@@ -9,6 +9,7 @@ readonly BAM=$2
 readonly FINAL_VCF=$3 # alt.ploidy.conflict.resolved.vcf
 readonly THREADS=$4
 readonly PLOIDY=$5 
+readonly CONTAINER="$6"
 
 readonly prefix=$(basename "${BAM%%.sorted.dedup.bam}")
 
@@ -19,5 +20,7 @@ whatshap polyphase "${FINAL_VCF}".gz "${BAM}" -o /pipeline/output/"${prefix}".al
 
 ## These commands ensure that the output is not saved with root:root ownership.
 ## GID is group id env variable 
-chown -Rc :"${GID:-0}" /pipeline/output
+if [ "${CONTAINER}" = 'docker' ]; then
+    chown -Rc :"${GID:-0}" /pipeline/output
+fi 
 chmod -Rc g+w,o-rwx /pipeline/output

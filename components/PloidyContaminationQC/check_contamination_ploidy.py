@@ -305,6 +305,7 @@ if __name__ == '__main__':
     parser.add_argument('--pseudovcf', type=str, help='Differences in amp sequence from pseudogene', required=False, default=None)
     parser.add_argument('--output_prefix', type=str, help='Output_prefix', required=True)
     parser.add_argument('--gid', type=str, default='0')
+    parser.add_argument('--container', type=str, default='singularity')
     args = parser.parse_args()
     print("PROGRAM ARGUMENTS: ", vars(args))
 
@@ -351,6 +352,7 @@ if __name__ == '__main__':
             f.write(i + '\n')
 
     pd.DataFrame(verdict_results, index=[os.path.basename(args.output_prefix)]).to_csv(f'{args.output_prefix}.contamination_ploidy_results_mqc.txt', sep='\t')
-
-    subprocess.run(['chown', '-Rc', f':{args.gid}', '/pipeline/output'], capture_output=True, text=True, check=True)
+    
+    if args.container == 'docker':
+        subprocess.run(['chown', '-Rc', f':{args.gid}', '/pipeline/output'], capture_output=True, text=True, check=True)
     subprocess.run(['chmod', '-Rc', 'g+w,o-rwx', '/pipeline/output'], capture_output=True, text=True, check=True)

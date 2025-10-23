@@ -8,7 +8,9 @@ input:
 
 # ===== OUTPUT SETTINGS ====         
 output:
-    output_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/out_5'
+    output_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/out_6'
+    save_all_callers: True
+    # this flag is used to mark if all callers outputs should be preserved, or only conflic resolved output should be saved 
 
 # ===== REFERENCE SETTINGS ====  
 
@@ -25,7 +27,7 @@ run_settings:
     engine: 'singularity' # singularity OR docker 
 
 user_settings:
-    # your group (or other group id) so that final files will be saved from your user, not as root user 
+    # your group (or other group id) so that final files in docker will be saved from your user, not as root user 
     # get the number with "id -g" in terminal 
     GID: 2009 
 
@@ -35,32 +37,32 @@ user_settings:
 # memory and cpus for each of the rules
 rules_settings:
     fastq2bam: 
-        runtime: 300
+        runtime: 200
         mem_mb: 4000
         cpus_per_task: 15
         
     HaplotypeCaller: 
-        runtime: 300
+        runtime: 200
         mem_mb: 4000
         cpus_per_task: 15
         
     mosdepth:
-        runtime: 300
+        runtime: 200
         mem_mb: 4000
         cpus_per_task: 4
         
     mpileup:
-        runtime: 300
+        runtime: 200
         mem_mb: 4000
         cpus_per_task: 15
         
     DeepVariant: 
-        runtime: 500
+        runtime: 400
         mem_mb: 4000
         cpus_per_task: 15
     
     resolve_conflicts:
-        runtime: 200
+        runtime: 100
         mem_mb: 500
         cpus_per_task: 2
 
@@ -70,42 +72,42 @@ rules_settings:
         cpus_per_task: 15
 
     PloidyContaminationQC:
-        runtime: 200
+        runtime: 100
         mem_mb: 500
         cpus_per_task: 2
 
     index_reference:
-        runtime: 300
+        runtime: 200
         mem_mb: 1000
         cpus_per_task: 2 
 
     gatk_dict:
-        runtime: 300
+        runtime: 200
         mem_mb: 1000
         cpus_per_task: 2 
 
     pseudogenic_synth_reads:
-        runtime: 300
+        runtime: 200
         mem_mb: 2000
-        cpus_per_task: 15
+        cpus_per_task: 10
 
     generate_pseudo_synth_bam:
-        runtime: 300
+        runtime: 200
         mem_mb: 2000
-        cpus_per_task: 15
+        cpus_per_task: 10
 
     call_variants_different_in_gene:
-        runtime: 300
+        runtime: 200
         mem_mb: 2000
-        cpus_per_task: 15
+        cpus_per_task: 10
 
     HaplotypeCallerAltPloidy:
-        runtime: 600
+        runtime: 500
         mem_mb: 6000
         cpus_per_task: 15
 
     quality_checked_AltPloidy:
-        runtime: 200
+        runtime: 100
         mem_mb: 500
         cpus_per_task: 2
 

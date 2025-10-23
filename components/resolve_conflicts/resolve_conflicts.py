@@ -357,6 +357,7 @@ if __name__ == '__main__':
     parser.add_argument('--pileup', type=str, help='Bcftools pileup', required=True)
     parser.add_argument('--output_prefix', type=str, help='Output_prefix', required=True)
     parser.add_argument('--gid', type=str, default='0')
+    parser.add_argument('--container', type=str, default='singularity')
     args = parser.parse_args()
     print("PROGRAM ARGUMENTS: ", vars(args))
 
@@ -381,5 +382,6 @@ if __name__ == '__main__':
     
     write_vcf(comments, final_vcf, f'{args.output_prefix}.conflict.resolved.vcf')
 
-    subprocess.run(['chown', '-Rc', f':{args.gid}', '/pipeline/output'], capture_output=True, text=True, check=True)
+    if args.container == 'docker':
+        subprocess.run(['chown', '-Rc', f':{args.gid}', '/pipeline/output'], capture_output=True, text=True, check=True)
     subprocess.run(['chmod', '-Rc', 'g+w,o-rwx', '/pipeline/output'], capture_output=True, text=True, check=True)

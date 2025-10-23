@@ -4,21 +4,24 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-while getopts 'P:j:a:' flag
+while getopts 'P:j:a:c:' flag
 do
     case "${flag}" in
         P) PSEUDO_COORDS=${OPTARG};;
         j) THREADS=${OPTARG};;
         a) AMPLICON_REF=${OPTARG};;
+        c) CONTAINER=${OPTARG};;
     esac
 done
 
 # simulate variants from pseudogenic reads
-bwa-mem2/bwa-mem2 mem -t "${THREADS}" "${AMPLICON_REF}" /pipeline/input/"${PSEUDO_COORDS}".temp.pseudo_read1.fq.gz /pipeline/input/"${PSEUDO_COORDS}".temp.pseudo_read2.fq.gz -U 6 |  
+/pipeline/tools/bwa-mem2/bwa-mem2 mem -t "${THREADS}" "${AMPLICON_REF}" /pipeline/input/"${PSEUDO_COORDS}".temp.pseudo_read1.fq.gz /pipeline/input/"${PSEUDO_COORDS}".temp.pseudo_read2.fq.gz -U 6 |  
 samtools view -@ "${THREADS}" -S -b - |
 samtools sort  -@ "${THREADS}" - > /pipeline/output/"${PSEUDO_COORDS}".pseudoalign.bam
 
 ## These commands ensure that the output is not saved with root:root ownership.
 ## GID is group id env variable 
-chown -Rc :"${GID:-0}" /pipeline/output
+if [ "${CONTAINER}" = 'docker' ]; then
+    chown -Rc :"${GID:-0}" /pipeline/output
+fi 
 chmod -Rc g+w,o-rwx /pipeline/output
