@@ -142,7 +142,7 @@ def get_alt_need(wildcards, output_folder):
     :param: output_folder: str, folder where output is written 
     :return: str or empty list, paths to add to rule input 
     '''
-     with checkpoints.PloidyContaminationQC.get(sample=wildcards.sample).output.qc_result.open() as file:
+    with checkpoints.PloidyContaminationQC.get(sample=wildcards.sample).output.qc_result.open() as file:
         line = file.readlines()[1].strip('\n').split('\t')
         if (line[-1] != "[CRITICAL]"): 
             if int(line[-3]) > 2:
@@ -160,4 +160,4 @@ def get_full_container(container_name):
     if config['run_settings']['engine'] == 'singularity': 
         return os.path.join(rep_location, 'singularity_images', f'{container_name}.sif')
     else:
-        return f'amppipe/container_name'
+        return f'amppipe/{container_name}'

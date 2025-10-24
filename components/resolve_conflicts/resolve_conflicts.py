@@ -287,15 +287,15 @@ def form_final_vcf(resolved, vcfs):
                     if (tab['ALT'] == alt).any(): 
                         gen_add, source = num+1, caller_type
                     else: 
-                        gen_add, source = 0, 'pileup' 
-                    for i in range(sum([g == num+1 for g in old_genotype])): 
-                        new_genotype.append(gen_add)
+                        gen_add, source = 0, 'pileup'           
+                    for i in range(sum([int(g) == num+1 for g in old_genotype])): 
+                        new_genotype.append(str(gen_add))
                         quality_source.append(source)
                 for i in range(sum([g == 0 for g in old_genotype])):  
                     new_genotype.append(0)
                     quality_source.append(caller_type)
                 new_genotype, quality_source = '/'.join(new_genotype), '/'.join(quality_source)
-                    
+                
             vcf_in_pos_line['SAMPLE'] = vcf_in_pos_line['SAMPLE'].replace(vcf_in_pos_line['GT'], new_genotype) 
             
             # TO DO: find place to log quality source in vcf if needed 
@@ -383,5 +383,5 @@ if __name__ == '__main__':
     write_vcf(comments, final_vcf, f'{args.output_prefix}.conflict.resolved.vcf')
 
     if args.container == 'docker':
-        subprocess.run(['chown', '-Rc', f':{args.gid}', '/pipeline/output'], capture_output=True, text=True, check=True)
-    subprocess.run(['chmod', '-Rc', 'g+w,o-rwx', '/pipeline/output'], capture_output=True, text=True, check=True)
+        subprocess.run(['chown', '-Rc', f':{args.gid}', f'{args.output_prefix}.conflict.resolved.vcf', f'{args.output_prefix}.variant_conflict_resolution.log'], capture_output=True, text=True, check=True)
+    subprocess.run(['chmod', '-Rc', 'g+w,o-rwx', f'{args.output_prefix}.conflict.resolved.vcf', f'{args.output_prefix}.variant_conflict_resolution.log'], capture_output=True, text=True, check=True)

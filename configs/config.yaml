@@ -1,15 +1,16 @@
 # ===== INPUT SETTINGS ==== 
 
 input:
-    input_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/in' # input folder with raw fastq files 
+    input_folder: '/primary/data/common/VDKN/CSP_VDKN_amplicons_RAW/2024-01-18_VDKN_amplicons/CYP21A2' # input folder with raw fastq files 
     include_patterns: []  # list of patterns or sample names to include, e.g. ['CYP21A2', 'SEQ[1,6]']
     exclude_patterns: [] # list of patterns or sample names to exclude, e.g. ['SAMPLE_1', 'SEQ[2,7]']
     fastq_extensions: ['fastq.gz', 'fq.gz']
 
 # ===== OUTPUT SETTINGS ====         
 output:
-    output_folder: '/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/out_8'
-    save_all_callers: False
+    output_folder: '/primary/data/common/VDKN/VDKN_amplicons_full_cohort_recalculated/2024-01-18_VDKN_amplicons'
+    save_all_callers: True
+    # True or False 
     # this flag is used to mark if all callers outputs should be preserved, or only conflict resolved output should be saved 
 
 # ===== REFERENCE SETTINGS ====  
@@ -24,7 +25,7 @@ references:
 # ===== EXECUTION PARAMS ===== 
     
 run_settings:
-    engine: 'docker' # singularity OR docker 
+    engine: 'singularity' # singularity OR docker 
 
 user_settings:
     # your group (or other group id) so that final files in docker will be saved from your user, not as root user 
