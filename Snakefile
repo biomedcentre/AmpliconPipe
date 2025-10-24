@@ -1,6 +1,5 @@
 import os 
 
-configfile: "config.yaml"
 include: "utils.smk"
 
 wildcard_constraints:

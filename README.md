@@ -15,5 +15,5 @@ id -g
 ```
 To launch 
 ```
-snakemake -p --cores 45 --default-resources "tmpdir='/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/tmp'"
+snakemake -p --cores 45 --default-resources "tmpdir='/primary/data/zantysheva/projects/vdkn/AmpPipe_testing/tmp'" --configfile configs/config.yaml 
 ```

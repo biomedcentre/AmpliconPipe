@@ -7,31 +7,31 @@ docker: deepvariant_docker fastq2bam_docker gatk_docker generate_pseudo_reads_do
 
 deepvariant_singularity:
 	mkdir -p singularity_images
-	singularity build --fakeroot singularity_images/deepvariant.sif singularity_recipes/deepvariant.def
+	singularity build --fakeroot singularity_images/deepvariant.sif singularity_recipies/deepvariant.def
 
 fastq2bam_singularity:
 	mkdir -p singularity_images
-	singularity build --fakeroot singularity_images/fastq2bam.sif singularity_recipes/fastq2bam.def
+	singularity build --fakeroot singularity_images/fastq2bam.sif singularity_recipies/fastq2bam.def
 
 gatk_singularity:
 	mkdir -p singularity_images
-	singularity build --fakeroot singularity_images/gatk.sif singularity_recipes/gatk.def
+	singularity build --fakeroot singularity_images/gatk.sif singularity_recipies/gatk.def
 
 generate_pseudo_reads_singularity:
 	mkdir -p singularity_images
-	singularity build --fakeroot singularity_images/generate_pseudo_reads.sif singularity_recipes/generate_pseudo_reads.def
+	singularity build --fakeroot singularity_images/generate_pseudo_reads.sif singularity_recipies/generate_pseudo_reads.def
 
 mosdepth_singularity:
 	mkdir -p singularity_images
-	singularity build --fakeroot singularity_images/mosdepth.sif singularity_recipes/mosdepth.def
+	singularity build --fakeroot singularity_images/mosdepth.sif singularity_recipies/mosdepth.def
 
 mpileup_singularity:
 	mkdir -p singularity_images
-	singularity build --fakeroot singularity_images/mpileup.sif singularity_recipes/mpileup.def
+	singularity build --fakeroot singularity_images/mpileup.sif singularity_recipies/mpileup.def
 
 python_and_whatshap_singularity:
 	mkdir -p singularity_images
-	singularity build --fakeroot singularity_images/python_and_whatshap.sif singularity_recipes/python_and_whatshap.def
+	singularity build --fakeroot singularity_images/python_and_whatshap.sif singularity_recipies/python_and_whatshap.def
 
 deepvariant_docker:
 	docker build docker_images/DeepVariant \
