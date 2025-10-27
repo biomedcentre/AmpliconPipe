@@ -70,7 +70,7 @@ def filename_to_sample(name):
     return basename 
 
 
-def find_pattern(name, patterns):
+def find_pattern(name, patterns, p_type):
     '''
     Searches for patterns in the name, if any present, returns true 
     :param: name: str, name 
@@ -80,8 +80,15 @@ def find_pattern(name, patterns):
     for pattern in patterns: 
         match = re.search(pattern, name)
         if match:
-            return True
-    return False
+            found = True
+            break
+    else:
+        found = False
+
+    if p_type == 'include_patterns':
+        return found 
+    else:
+        return not found 
 
 
 def get_sample_names(input_folder): 
@@ -99,7 +106,7 @@ def get_sample_names(input_folder):
     # filter sample names for patterns 
     for p_type in ['include_patterns', 'exclude_patterns']:
         if len(config['input'][p_type]) > 0: 
-            sample_names = [name for name in sample_names if find_pattern(name, config['input'][p_type])]
+            sample_names = [name for name in sample_names if find_pattern(name, config['input'][p_type], p_type)]
 
     # find sample names that have at least 2 fastq 
     sample_counts = {}

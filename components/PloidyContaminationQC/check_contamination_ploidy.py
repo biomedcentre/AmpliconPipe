@@ -183,12 +183,19 @@ def estimate_peak_fits(vaf_vector, log_buffer, prefix, max_ploidy=3, fit_type='A
     :return log_buffer: list, updated log_buffer 
     '''
     # TO DO ADDITIONAL CHECK FOR ABSENCE FOR HETEROZYGOUS FOR PLOIDY 1 MAY BE NEEDED 
-    minimal_peak_size = 5
-    allowed_std = 3 
+    minimal_peak_size = 3
+    allowed_std = 10
     max_peaks = 4
+    minimal_vaf_vector_len = 4
+    max_allowed = 0.08
 
     plot_vaf_vector(vaf_vector, prefix, fit_type) # plotting at this point for now
 
+    # check min length 
+    if len(vaf_vector) < minimal_vaf_vector_len: 
+        log_buffer.append(f'[WARNING] {fit_type} fit: Not enough variants (<{minimal_vaf_vector_len}) for VAF peak analysis. Contamination and ploidy will not be estimated')
+        return False, False, log_buffer 
+    
     # choose best GM and filter before merge 
     best_n, gm = choose_best_gm(vaf_vector, max_components=min(max_peaks, len(vaf_vector) - 1))
     pred_labels = pd.Series(gm.predict(np.array(vaf_vector).reshape(-1, 1)), index=vaf_vector.index)
@@ -203,7 +210,7 @@ def estimate_peak_fits(vaf_vector, log_buffer, prefix, max_ploidy=3, fit_type='A
     good_peaks_stats = concated_peaks_stats[concated_peaks_stats['samples'] > minimal_peak_size]
     
     if len(good_peaks_stats) == 0: # no peaks with enough variants 
-        log_buffer.append(f'[WARNING] {fit_type} fit: each peak in the best fit contains less than 5 variants. Contamination and ploidy will not be estimated')
+        log_buffer.append(f'[WARNING] {fit_type} fit: each peak in the best fit contains less than {minimal_peak_size} variants. Contamination and ploidy will not be estimated')
         return False, False, log_buffer 
  
     ploidy = False 
@@ -217,9 +224,10 @@ def estimate_peak_fits(vaf_vector, log_buffer, prefix, max_ploidy=3, fit_type='A
         peak_match = {}
         for idx, row in good_peaks_stats.iterrows(): # looking for matches for peaks of fit
             for match in expected_vafs[::-1]: # starting from larger vafs as stats table also starts from larger stats 
-                if (match > (row['mean'] - allowed_std*row['std'])) & (match < (row['mean'] + allowed_std*row['std'])):  
+                allowed_distance = min(allowed_std*row['std'], max_allowed)
+                if (match > (row['mean'] - allowed_distance)) & (match < (row['mean'] + allowed_distance)):  
                     peak_match[row['name']] = match 
-                    expected_vafs = [i for i in expected_vafs if i < match]
+                    expected_vafs = [i for i in expected_vafs if i != match]
                     break # match found, skip iteration over expected vafs
             else: 
                 log_buffer.append(f'[INFO] {fit_type} fit: No match found for peak with mean {row["mean"]} and std {row["std"]} in VAF peaks expected for ploidy {p}. Ploidy rejected')

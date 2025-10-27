@@ -446,6 +446,7 @@ rule multiqc:
         regions = os.path.join(output_folder, "{sample}.regions.bed.gz"),
         thresholds = os.path.join(output_folder, "{sample}.thresholds.bed.gz"),
         qc_result = os.path.join(output_folder, "{sample}.contamination_ploidy_results_mqc.txt"),
+        phased_vcf = os.path.join(output_folder, "{sample}.phased.vcf.gz"),
         phased_vcf_alt = lambda wildcards: get_alt_need(wildcards, output_folder)
     output: 
         multi_qc_report = os.path.join(output_folder, "{sample}.multiqc.html")
