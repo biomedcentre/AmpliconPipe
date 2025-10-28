@@ -8,7 +8,14 @@ from math import sqrt
 from sklearn.mixture import GaussianMixture
 import subprocess 
 
-# TO DO: extract constants from all functions and fix them here 
+# general constants 
+minimal_vaf_vector_len = 4
+pseudogenic_thres = 50
+# constants for estimate peak fits 
+minimal_peak_size = 3
+allowed_std = 10
+max_peaks = 4
+max_allowed = 0.08
 
 def read_vcf(link): 
     '''
@@ -111,7 +118,8 @@ def plot_vaf_vector(vaf_vector, prefix, fit_type):
     fig, ax = plt.subplots(1, 1, figsize=(6, 6))
     sns.histplot(vaf_vector, bins=15, binrange=(0, 1), ax=ax)
     sns.kdeplot(vaf_vector, ax=ax)
-    ax.set_title(f'{fit_type} VAF')
+    plot_name = fit_type.replace('_', ' ').title()
+    ax.set_title(f'{plot_name} VAF')
     ax.set_xlim(-0.05, 1.05)
     plt.rcParams['figure.dpi'] = 150
     plt.savefig(f'{prefix}.{fit_type}.VAF_mqc.png')
@@ -170,32 +178,17 @@ def concat_close_baf_peaks(good_peaks_stats, pred_labels, vaf_vector, allowed_st
     return new_good_peaks_stats
             
 
-def estimate_peak_fits(vaf_vector, log_buffer, prefix, max_ploidy=3, fit_type='All variants'):
+def estimate_peak_fits(vaf_vector, log_buffer, max_ploidy=3, fit_type='All variants'):
     '''
     Fits GM for VAF vector and checks list of ploidies to see if any fits. 
     :param vaf_vector: pd.Series, vector of vafs for variants
     :param log_buffer: list, list of logged string about ploidy fits
-    :param prefix: str, path to output
     :param max_ploidy: int, max ploidy that will be tested. Default is 3 for better peak resolution
     :param fit_type: str, description of current set of variants 
     :return: bool, if there was enough data for fit
     :return ploidy: bool or int, fit result
     :return log_buffer: list, updated log_buffer 
     '''
-    # TO DO ADDITIONAL CHECK FOR ABSENCE FOR HETEROZYGOUS FOR PLOIDY 1 MAY BE NEEDED 
-    minimal_peak_size = 3
-    allowed_std = 10
-    max_peaks = 4
-    minimal_vaf_vector_len = 4
-    max_allowed = 0.08
-
-    plot_vaf_vector(vaf_vector, prefix, fit_type) # plotting at this point for now
-
-    # check min length 
-    if len(vaf_vector) < minimal_vaf_vector_len: 
-        log_buffer.append(f'[WARNING] {fit_type} fit: Not enough variants (<{minimal_vaf_vector_len}) for VAF peak analysis. Contamination and ploidy will not be estimated')
-        return False, False, log_buffer 
-    
     # choose best GM and filter before merge 
     best_n, gm = choose_best_gm(vaf_vector, max_components=min(max_peaks, len(vaf_vector) - 1))
     pred_labels = pd.Series(gm.predict(np.array(vaf_vector).reshape(-1, 1)), index=vaf_vector.index)
@@ -244,66 +237,146 @@ def estimate_peak_fits(vaf_vector, log_buffer, prefix, max_ploidy=3, fit_type='A
     return True, ploidy, log_buffer 
 
 
-def verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, pseudo_vector_in_sample):
+def process_vector_fit(vector, log_buffer, fit_results, fit_type):
     '''
-    Combines results of fits to get final verdict 
-    :param first_data: bool, if first fit had enough data for fit
-    :param first_ploidy: int or bool, result of first fit 
-    :param second_data: bool, if second fit had enough data for fit
-    :param second_ploidy: int or bool, result of second fit 
-    :param pseudo_vector_in_sample: float, persent of pseudogenic variants present in sample
-    :return fit_ok: bool, if any fits had enough data
-    :return ploidy_found: bool, if any fits were sucessfull 
-    :return final_ploidy: int, ploidy if any
-    :return verdict: str, text verdict 
-    :return log_app_type: str, info or warning 
+    Fits ploidy distribution, save results into dict structure or returns that data not sufficient for fit
+    :param vector: pd.DataFrame, gt table for sample
+    :param log_buffer: list, list of logged string about ploidy fits
+    :param fit_results: dict of dicts with fit results
+    :param fit_type: str, description of current set of variants 
+    :return fit_results: dict of dicts with fit results
+    :return log_buffer: list, list of logged string about ploidy fits
+    '''
+
+    fit_results[fit_type] = {} 
+    if (len(vector) < minimal_vaf_vector_len):
+        log_buffer.append(f'[WARNING] {fit_type} fit: Not enough variants (<{minimal_vaf_vector_len}) for VAF peak analysis. Contamination and ploidy will not be estimated')
+        fit_results[fit_type]['data'], fit_results[fit_type]['ploidy'] = False, False
+    else: 
+        fit_results[fit_type]['data'], fit_results[fit_type]['ploidy'], log_buffer = estimate_peak_fits(vector['VAF'], log_buffer, fit_type=fit_type)
+
+    return fit_results, log_buffer
+
+
+def plot_vaf_distributions_for_fits(vectors, mode, prefix):
+    '''
+    Plots fits depending on the mode.
+    :param vectors: dict of gt tables
+    :param mode: str, mode
+    :param prefix: str, path to output
+    '''
+
+    names_of_plots = {'all': 'all_variants', 'pseudo': 'pseudogenic_variants', 'nonpseudo': 'non_pseudogenic_variants'}
+    if mode == 'all': 
+        plot_vaf_vector(vectors['all']['VAF'], prefix, names_of_plots['all']) 
+    else: 
+        for k in vectors: 
+            plot_vaf_vector(vectors[k]['VAF'], prefix, names_of_plots[k]) 
+
+
+def ploidy_fits(vectors, mode, log_buffer):
+    '''
+    Fits ploidy using vaf vectors. Switches mode if detectes not sufficient data in fit, does additional fits if needeed 
+    :param vectors: dict of gt tables
+    :param mode: str, mode
+    :param log_buffer: list, list of logged string about ploidy fits
     '''
     
-    pseudo_v_thres = 0.75
-    fit_ok, ploidy_found, final_ploidy = (first_data | second_data), True, None
-
-    
-    if not fit_ok: # no data
-        ploidy_found, log_app_type, final_ploidy = False, '[WARNING]', 2
-        verdict = 'Not enough variants for sucessful fits. Contamination and ploidy will not be estimated. Default 2 is used'
-
-    elif (not first_ploidy) & (not second_ploidy): # both ploidies not found 
-        ploidy_found, log_app_type = False, '[CRITICAL]'
-        verdict = 'All ploidy fits returned contamination or ploidy higher than 3.  Contamination risk'
-    
-    elif first_data & (not second_data): # only first fit present
-        log_app_type, final_ploidy = '[INFO]', first_ploidy
-        verdict = 'Ploidy fitted. No contamination risk'
+    fit_results = {}
+    if mode == 'all': # if all mode is chosen
+        fit_results, log_buffer = process_vector_fit(vectors['all'], log_buffer, fit_results, 'all')
+    else: 
+        fit_results, log_buffer = process_vector_fit(vectors['pseudo'], log_buffer, fit_results, 'pseudo')
+        fit_results, log_buffer = process_vector_fit(vectors['nonpseudo'], log_buffer, fit_results, 'nonpseudo')
         
-    elif (not first_data) & second_data: # only second fit present 
-        log_app_type, final_ploidy = '[INFO]', second_ploidy
-        verdict = 'Ploidy fitted. No contamination risk'
+        # check if additional all fit is needed 
+        if ((not fit_results['pseudo']['data']) | (not fit_results['nonpseudo']['data'])): 
+            mode = 'all'
+            log_buffer.append('[INFO]: One of two fits returned insufficient data for getting confident peaks. Switching to all mode despite pseudogene sequence given') 
+            fit_results, log_buffer = process_vector_fit(vectors['all'], log_buffer, fit_results, 'all')
+        elif (fit_results['pseudo']['ploidy'] == 1) | (fit_results['nonpseudo']['ploidy'] == 1):
+            log_buffer.append('[INFO]: At least one of two fits returned ploidy 1. Additionaly fitting all mode to ensure that no peaks got missed due to division of data')
+            fit_results, log_buffer = process_vector_fit(vectors['all'], log_buffer, fit_results, 'all')
 
-    elif (bool(first_ploidy) is False) | (bool(second_ploidy) is False): # one fit good, other no ploidy 
-        ploidy_found, log_app_type, final_ploidy = True, '[CRITICAL]', max(first_ploidy, second_ploidy)
-        verdict = 'One of the two fits returned contamination or ploidy higher than 3. Contamination risk'
-        
-    else: # 2 good fits 
-        if first_ploidy == second_ploidy:  # results match 
-            log_app_type, final_ploidy = '[INFO]', first_ploidy
-            verdict = 'Ploidies in both fits match. No contamination'
+    return fit_results, log_buffer, mode
+
+
+def pseudogenic_content_verdict(percent_of_pseudogenic, pseudogenic_thres=50, mode='all'):
+    '''
+    Asseses pseudogenic content if at least one of two fits returned contamination and forms verdict 
+    :param percent_of_pseudogenic: float, percent of pseudogenic variants out of all possible pseudogenic variants
+    :param pseudogenic_thres: float, percent of pseudogenic variants out of all possible pseudogenic variants
+    :param mode: str, mode
+    :return verdict: str, verdict line
+    '''
+    if mode != 'all':
+        insert = 'One of two fits'
+    else: 
+        instert = 'Fit(s)'
+
+    if percent_of_pseudogenic < pseudogenic_thres:
+        verdict = f'{insert} returned contamination or ploidy higher than 3. Pseudogenic content low. Non-pseudogenic contamination risk'
+    else:
+        verdict = f'{insert} returned contamination or ploidy higher than 3. Pseudogenic content high. Pseudogenic contamination risk'
+
+    return verdict 
+
+
+def verdict_ploidy(fit_results, log_buffer, mode, percent_of_pseudogenic):
+    '''
+    :param fit_results: dict of dicts with fit results
+    :param log_buffer: list, list of logged string about ploidy fits
+    :param mode: str, mode
+    :param percent_of_pseudogenic: float, percent of pseudogenic variants out of all possible pseudogenic variants
+    '''
+    fit_ok = True
+    
+    if mode == 'all':
+        if not fit_results['all']['data']:
+            fit_ok = False 
+            ploidy_found, log_app_type, final_ploidy = False, '[WARNING]', 2
+            verdict = 'Not enough variants for confident peaks in fit. Contamination and ploidy will not be estimated. Default 2 is used'
             
-        elif (first_ploidy != 3) & (second_ploidy != 3):
-            if pseudo_vector_in_sample > pseudo_v_thres:
-                log_app_type, final_ploidy = '[WARNING]', max(first_ploidy, second_ploidy)
-                verdict = 'Ploidies in both fits do not match, both ploidies lower than 3. High pseudogenic content, low contamination risk is present'
-            else: 
-                log_app_type, final_ploidy = '[INFO]', max(first_ploidy, second_ploidy)
-                verdict = 'Ploidies in both fits do not match, both ploidies lower than 3. No contamination risk'
-        else: 
-            if pseudo_vector_in_sample > pseudo_v_thres: 
-                log_app_type, final_ploidy = '[WARNING]', max(first_ploidy, second_ploidy)
-                verdict = 'Ploidies in both fits do not match, one of ploidies higher than 3. High pseudogenic content, contamination risk'
-            else: 
-                log_app_type, final_ploidy = '[INFO]', max(first_ploidy, second_ploidy)
-                verdict = 'Ploidies in both fits do not match, one of ploidies higher than 3. No contamination risk. Ploidy detection may be unstable'
+        elif not bool(fit_results['all']['ploidy']):
+            ploidy_found, log_app_type, final_ploidy = False, '[CRITICAL]', None 
+            verdict = pseudogenic_content_verdict(percent_of_pseudogenic)
+        
+        else:
+            ploidy_found, log_app_type, final_ploidy = True, '[INFO]', fit_results['all']['ploidy']
+            verdict = 'Ploidy fitted. No contamination risk'
 
-    return fit_ok, ploidy_found, final_ploidy, verdict, log_app_type
+    else: 
+        if (not bool(fit_results['pseudo']['ploidy'])) & (not bool(fit_results['nonpseudo']['ploidy'])):
+            ploidy_found, log_app_type, final_ploidy = False, '[CRITICAL]', None
+            verdict = pseudogenic_content_verdict(percent_of_pseudogenic)
+        
+        elif (not bool(fit_results['pseudo']['ploidy'])) | (not bool(fit_results['nonpseudo']['ploidy'])):
+            ploidy_found, log_app_type, final_ploidy = True, '[WARNING]', max(fit_results['pseudo']['ploidy'], fit_results['nonpseudo']['ploidy'])
+            verdict = pseudogenic_content_verdict(percent_of_pseudogenic, mode=mode)
+
+        elif fit_results['pseudo']['ploidy'] != fit_results['nonpseudo']['ploidy']:
+            
+            if percent_of_pseudogenic > pseudogenic_thres:
+                ploidy_found, log_app_type, final_ploidy = True, '[WARNING]', max(fit_results['pseudo']['ploidy'], fit_results['nonpseudo']['ploidy'])
+                verdict = 'Ploidies in both fits do not match, both ploidies equal or lower than 3. High pseudogenic content, low contamination risk is present'
+            else: 
+                ploidy_found, log_app_type, final_ploidy = True, '[INFO]', max(fit_results['pseudo']['ploidy'], fit_results['nonpseudo']['ploidy'])
+                verdict = 'Ploidies in both fits do not match, both ploidies  equal or lower than 3. No contamination risk'
+
+        elif (fit_results['pseudo']['ploidy'] == 1) | (fit_results['nonpseudo']['ploidy'] == 1):
+            
+            if fit_results['all']['data'] & bool(fit_results['all']['ploidy']):
+                ploidy_found, log_app_type, final_ploidy = True, '[INFO]', fit_results['all']['ploidy']
+                verdict = 'Ploidy 1 in both fits, using all variants fit to determine joint ploidy'
+            else: 
+                ploidy_found, log_app_type, final_ploidy = True, '[WARNING]', 1
+                verdict = 'Ploidy 1 in both fits, but all variants fit failed. Ploidy may be unconfirmed'
+
+        else: 
+            ploidy_found, log_app_type, final_ploidy = True, '[INFO]', max(fit_results['pseudo']['ploidy'], fit_results['nonpseudo']['ploidy'])
+            verdict = 'Ploidies in both match, both ploidies equal or lower than 3. No contamination risk'
+        
+    return fit_ok, ploidy_found, final_ploidy, verdict, log_app_type          
 
 
 if __name__ == '__main__':  
@@ -318,40 +391,27 @@ if __name__ == '__main__':
     print("PROGRAM ARGUMENTS: ", vars(args))
 
     vcf = read_vcf(args.hc_vcf)
-    gt_vector = genotype_vectors(vcf)
-    
-    if args.pseudovcf is not None: 
-        pseudo_vcf = read_vcf(args.pseudovcf)
-        pseudogene_vector = genotype_vectors(pseudo_vcf)
-        intersection = pseudogene_vector.index.intersection(gt_vector.index)
-        pseudo_vector_in_sample, nonpseudo_vector_in_sample = gt_vector.loc[intersection], gt_vector.drop(intersection)
-        fit_type = 'Non-pseudogenic variants' 
-    else: 
-        pseudo_vector_in_sample, nonpseudo_vector_in_sample = [], gt_vector
-        fit_type = 'All variants' 
-
-    
-    # do contamination check on all SNP or non-pseudogenic
+    vectors = {'all': genotype_vectors(vcf)}
     log_buffer = []
-    first_data, first_ploidy, log_buffer = estimate_peak_fits(nonpseudo_vector_in_sample['VAF'], log_buffer, args.output_prefix, fit_type=fit_type)
 
-    # # do contamination check on pseudo
-    if len(pseudo_vector_in_sample) > 0: 
-        second_data, second_ploidy, log_buffer = estimate_peak_fits(pseudo_vector_in_sample['VAF'], log_buffer, args.output_prefix, fit_type='Pseudogenic variants')
-        percent_of_pseudogenic = len(pseudo_vector_in_sample)/len(pseudogene_vector)*100 
-    else: 
-        second_data, second_ploidy, percent_of_pseudogenic = False, False, None
+    mode, pseudo_percent = 'all', None
+    if args.pseudovcf is not None: 
+        pseudogene_vector = genotype_vectors(read_vcf(args.pseudovcf))
+        intersection = pseudogene_vector.index.intersection(vectors['all'].index)
+        vectors['pseudo'], vectors['nonpseudo'] = vectors['all'].loc[intersection], vectors['all'].drop(intersection)
+        if (len(vectors['pseudo']) >= minimal_vaf_vector_len) & (len(vectors['nonpseudo']) >= minimal_vaf_vector_len):
+            mode = 'separate'
+        else: 
+            log_buffer.append(f'[INFO]: One of two modes (pseudo/nonpseudo) has <{minimal_vaf_vector_len} variants. Switching to all mode despite pseudogene sequence given')
+        percent_of_pseudogenic = len(vectors['pseudo'])/len(pseudogene_vector)*100 
 
-    # if quality of fit was low because of split, try them all 
-    if (len(pseudo_vector_in_sample) > 0) & (not first_data) & (not second_data):
-        first_data, first_ploidy, log_buffer = estimate_peak_fits(gt_vector['VAF'], log_buffer, args.output_prefix)
-    elif (len(pseudo_vector_in_sample) > 0) & (not second_data): 
-        second_data, second_ploidy = first_data, first_ploidy
-        first_data, first_ploidy, log_buffer = estimate_peak_fits(gt_vector['VAF'], log_buffer, args.output_prefix)
+    # fit ploidies and draw plots for fitted 
+    fit_results, log_buffer, mode = ploidy_fits(vectors, mode, log_buffer)
+    plot_vaf_distributions_for_fits(vectors, mode, args.output_prefix)
 
-    verdict_results = {j: i for i, j in zip(verdict_ploidy(first_data, first_ploidy, second_data, second_ploidy, percent_of_pseudogenic), 
+    verdict_results = {j: i for i, j in zip(verdict_ploidy(fit_results, log_buffer, mode, percent_of_pseudogenic), 
                                             ['Enough_data_in_fit', 'Ploidy_well_fitted', 'ploidy', 'verdict', 'log_app_type'])}
-
+    verdict_results['mode'] = mode
     log_buffer.append(' '.join([verdict_results['log_app_type'], verdict_results['verdict']]))
 
     # write logs 
@@ -362,5 +422,5 @@ if __name__ == '__main__':
     pd.DataFrame(verdict_results, index=[os.path.basename(args.output_prefix)]).to_csv(f'{args.output_prefix}.contamination_ploidy_results_mqc.txt', sep='\t')
     
     if args.container == 'docker':
-        subprocess.run(['chown', '-Rc', f':{args.gid}', '/pipeline/output'], capture_output=True, text=True, check=True)
-    subprocess.run(['chmod', '-Rc', 'g+w,o-rwx', '/pipeline/output'], capture_output=True, text=True, check=True)
+        subprocess.run(['chown', '-Rc', f':{args.gid}', os.path.dirname(args.output_prefix)], capture_output=True, text=True, check=True)
+    subprocess.run(['chmod', '-Rc', 'g+w,o-rwx', os.path.dirname(args.output_prefix)], capture_output=True, text=True, check=True)
