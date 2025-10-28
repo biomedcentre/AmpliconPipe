@@ -151,8 +151,8 @@ def get_alt_need(wildcards, output_folder):
     '''
     with checkpoints.PloidyContaminationQC.get(sample=wildcards.sample).output.qc_result.open() as file:
         line = file.readlines()[1].strip('\n').split('\t')
-        if (line[-1] != "[CRITICAL]"): 
-            if int(line[-3]) > 2:
+        if (line[-2] != "[CRITICAL]"): 
+            if int(line[-4]) > 2:
                 return os.path.join(output_folder, f"{wildcards.sample}.alt.ploidy.phased.vcf.gz")
         
         return []

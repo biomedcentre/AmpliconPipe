@@ -12,7 +12,7 @@ import subprocess
 minimal_vaf_vector_len = 4
 pseudogenic_thres = 50
 # constants for estimate peak fits 
-minimal_peak_size = 3
+minimal_peak_size = 4
 allowed_std = 10
 max_peaks = 4
 max_allowed = 0.08
@@ -200,7 +200,7 @@ def estimate_peak_fits(vaf_vector, log_buffer, max_ploidy=3, fit_type='All varia
     peaks_stats = pd.DataFrame(peaks_stats, columns=['name', 'mean', 'std', 'samples']).sort_values(by='mean', ascending=False)
     
     concated_peaks_stats = concat_close_baf_peaks(peaks_stats, pred_labels, vaf_vector, allowed_std, max_ploidy).sort_values(by='mean', ascending=False)
-    good_peaks_stats = concated_peaks_stats[concated_peaks_stats['samples'] > minimal_peak_size]
+    good_peaks_stats = concated_peaks_stats[concated_peaks_stats['samples'] >= minimal_peak_size]
     
     if len(good_peaks_stats) == 0: # no peaks with enough variants 
         log_buffer.append(f'[WARNING] {fit_type} fit: each peak in the best fit contains less than {minimal_peak_size} variants. Contamination and ploidy will not be estimated')
@@ -312,7 +312,7 @@ def pseudogenic_content_verdict(percent_of_pseudogenic, pseudogenic_thres=50, mo
     if mode != 'all':
         insert = 'One of two fits'
     else: 
-        instert = 'Fit(s)'
+        insert = 'Fit(s)'
 
     if percent_of_pseudogenic < pseudogenic_thres:
         verdict = f'{insert} returned contamination or ploidy higher than 3. Pseudogenic content low. Non-pseudogenic contamination risk'
