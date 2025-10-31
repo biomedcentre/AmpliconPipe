@@ -1,14 +1,14 @@
 # ===== INPUT SETTINGS ==== 
 
 input:
-    input_folder: '/primary/data/common/VDKN/CSP_VDKN_amplicons_RAW/2024-08-08_VDKN_amplicons/240720_M07188_0029_000000000-JV646/' # input folder with raw fastq files 
+    input_folder: '/primary/data/common/VDKN/CSP_VDKN_amplicons_RAW/2024-12-09_VDKN_amplicons' # input folder with raw fastq files 
     include_patterns: []  # list of patterns or sample names to include, e.g. ['CYP21A2', 'SEQ[1,6]']
     exclude_patterns: ['XA'] # list of patterns or sample names to exclude, e.g. ['SAMPLE_1', 'SEQ[2,7]']
     fastq_extensions: ['fastq.gz', 'fq.gz']
 
 # ===== OUTPUT SETTINGS ====         
 output:
-    output_folder: '/primary/data/common/VDKN/VDKN_amplicons_full_cohort_recalculated/2024-08-08_VDKN_amplicons'
+    output_folder: '/primary/data/common/VDKN/VDKN_amplicons_full_cohort_recalculated/2024-12-09_VDKN_amplicons'
     save_all_callers: True
     # True or False 
     # this flag is used to mark if all callers outputs should be preserved, or only conflict resolved output should be saved 

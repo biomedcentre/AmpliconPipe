@@ -333,7 +333,7 @@ def verdict_ploidy(fit_results, log_buffer, mode, percent_of_pseudogenic, vector
     :param percent_of_pseudogenic: float, percent of pseudogenic variants out of all possible pseudogenic variants
     '''
     fit_ok = True
-    
+
     if mode == 'all':
         if not fit_results['all']['data']:
             fit_ok = False 
@@ -342,7 +342,7 @@ def verdict_ploidy(fit_results, log_buffer, mode, percent_of_pseudogenic, vector
             
         elif not bool(fit_results['all']['ploidy']):
             ploidy_found, log_app_type, final_ploidy = False, '[CRITICAL]', None 
-            verdic, log_app_type = pseudogenic_content_verdict_on_fail(percent_of_pseudogenic)
+            verdict, log_app_type = pseudogenic_content_verdict_on_fail(percent_of_pseudogenic)
         
         else:
             ploidy_found, log_app_type, final_ploidy = True, '[INFO]', fit_results['all']['ploidy']
