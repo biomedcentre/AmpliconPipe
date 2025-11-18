@@ -176,8 +176,24 @@ def concat_close_baf_peaks(good_peaks_stats, pred_labels, vaf_vector, allowed_st
     new_good_peaks_stats = pd.DataFrame(new_good_peaks_stats, columns=['name', 'mean', 'std', 'samples'])
     
     return new_good_peaks_stats
-            
 
+
+def additional_heterozygosity_check_for_p_1(vaf_vector, log_buffer):
+    '''
+    Checks presence of clearly heterozygous variants to eliminate false positives for ploidy call 1. 
+    :param vaf_vector: pd.Series, vector of vafs for variants
+    :param log_buffer: list, list of logged string about ploidy fits
+    :return: bool, if ploidy 1 is good 
+    :return log_buffer: list, updated log_buffer 
+    '''
+    if ((vaf_vector >= 0.25) & (vaf_vector <= 0.75)).any(): 
+        log_buffer.append('[INFO] Heterozygous variant(s) found. Ploidy 1 is rejected')
+        return False, log_buffer
+    else: 
+        log_buffer.append('[INFO] Heterozygous variant(s) not found. Ploidy 1 is accepted')
+        return True, log_buffer
+
+    
 def estimate_peak_fits(vaf_vector, log_buffer, max_ploidy=3, fit_type='All variants'):
     '''
     Fits GM for VAF vector and checks list of ploidies to see if any fits. 
@@ -228,8 +244,14 @@ def estimate_peak_fits(vaf_vector, log_buffer, max_ploidy=3, fit_type='All varia
                 
         if len(peak_match) == len(good_peaks_stats):
             log_buffer.append(f'[INFO] {fit_type} fit: All VAF peaks found in VAF peaks expected for ploidy {p}. Ploidy accepted')
-            ploidy = p 
-            break 
+            if p == 1: 
+                check, log_buffer = additional_heterozygosity_check_for_p_1(vaf_vector, log_buffer) # extra check for ploidy 1 
+                if check: 
+                    ploidy = p
+                    break
+            else:
+                ploidy = p 
+                break 
             
     else: # if cycle finished without finding ploidy 
         log_buffer.append(f'[WARNING] {fit_type} fit: VAF peaks do not match expected from ploides from 1, 2, 3. Contamination possible ')

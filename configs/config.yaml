@@ -2,7 +2,7 @@
 
 input:
     input_folder: '/primary/data/common/VDKN/CSP_VDKN_amplicons_RAW/2024-12-09_VDKN_amplicons' # input folder with raw fastq files 
-    include_patterns: []  # list of patterns or sample names to include, e.g. ['CYP21A2', 'SEQ[1,6]']
+    include_patterns: []  # list of patterns or sample names to include, e.g. ['CYP21A2', 'SEQ[1,6]'] 
     exclude_patterns: ['XA'] # list of patterns or sample names to exclude, e.g. ['SAMPLE_1', 'SEQ[2,7]']
     fastq_extensions: ['fastq.gz', 'fq.gz']
 

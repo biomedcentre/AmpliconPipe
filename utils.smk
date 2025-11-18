@@ -138,7 +138,7 @@ def get_fastq_input(wildcards, input_folder, rgroup):
     all_files = []
     for i in config['input']['fastq_extensions']:
         all_files = all_files + glob.glob(os.path.join(input_folder, f'{sample}*{rgroup}*{i}'))
-
+ 
     return sorted(all_files)[0]
 
 

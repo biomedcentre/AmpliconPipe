@@ -3,7 +3,7 @@ import os
 include: "utils.smk"
 
 wildcard_constraints:
-    sample = r'\w+'
+    sample = r'[\w-]+'
 
 samples = get_sample_names(input_folder)
 print(samples)

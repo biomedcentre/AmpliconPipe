@@ -167,12 +167,12 @@ def compare_positions_present_in_both_callers(resolved, log_buffer, gt_vectors_a
                 pileup_gt = gt_vectors_all['pileup']
                 for caller_type in ['hc', 'dv']: 
                     if pileup_gt == gt_vectors_all[caller_type][variant_id][0]: # found matching genotype in bcftools 
-                        log_buffer.append(f"[CONFLICT] Conflict at {variant_id}; {caller_type.upper()} genotype was supported by bcftools data")
+                        log_buffer.append(['[CONFLICT]', variant_id, 'Genotype corrected', caller_type.upper(), 'Genotype different between callers. Genotype supported by bcftools data chosen'])
                         resolved[variant_id] = caller_type
                         break 
                 else: 
                     resolved[variant_id] = 'pileup'  # LATER: write function to check if pileup correct
-                    log_buffer.append(f"[WARNING] Conflict at {variant_id}; All genotypes were not supported by bcftools data, choosing bcftools genotype")
+                    log_buffer.append(['[WARNING]', variant_id, 'Genotype corrected', 'pileup', 'All genotypes were not supported by bcftools data, choosing bcftools genotype'])
             else: 
                 # bcftools calls indels, but may miss some, this is why this code 
                 if hc_qual(gt_vectors_all['hc'][variant_id]):
@@ -180,7 +180,7 @@ def compare_positions_present_in_both_callers(resolved, log_buffer, gt_vectors_a
                 else: 
                     # LATER ADD ADDITIONAL CHECK FOR DV QUAL 
                     current_resolution = 'dv' 
-                log_buffer.append(f"[CONFLICT] Conflict at {variant_id}; No bcftools call data. {current_resolution.upper()} genotype chosen due to HC good qual")
+                log_buffer.append(['[CONFLICT]', variant_id, 'Genotype corrected', current_resolution.upper(), 'Genotype chosen with HC quality assesement'])
                 resolved[variant_id] = current_resolution
                 
     return resolved, log_buffer
@@ -207,20 +207,20 @@ def check_positions_present_in_one_caller(resolved, log_buffer, gt_vectors_all, 
         if caller_type == 'hc': # quality check, if qual okay, deem present
             if hc_qual(gt_vectors_all['hc'][variant_id]): 
                 resolved[variant_id] = 'hc'
-                log_buffer.append(f"[CONFLICT] Conflict at {variant_id}; HC genotype chosen due to HC good qual")
+                log_buffer.append(['[CONFLICT]', variant_id, 'Accepted', 'HC', 'Variant mismatch between callers. HC version chosen due to HC good qual'])
                 continue
         # else go check pileups; this may change if DV qual thresholds appear 
         if variant_id in gt_vectors_all['pileup'].keys(): 
             if gt_vectors_all[caller_type][variant_id][0] == gt_vectors_all['pileup'][variant_id][0]: # check if GT matches with pileup
                 resolved[variant_id] = caller_type
-                log_buffer.append(f"[CONFLICT] Conflict at {variant_id}; mismatch between callers. {caller_type} chosen due to bcftools match")
+                log_buffer.append(['[CONFLICT]', variant_id, 'Accepted', caller_type.upper(), f'Variant mismatch between callers. Variant present in bcftools, caller accepted.'])
             else: 
                 # TO DO: what to do if pileup genotype does not match; for MVP gonna trust in pileup but later probably will change that 
                 resolved[variant_id] = 'pileup' 
-                log_buffer.append(f"[WARNING] Conflict at {variant_id}; mismatch between callers; mismatch between caller and bcfftools; bcftools genotype chosen;")
+                log_buffer.append(['[WARNING]', variant_id, 'Accepted with different genotype', 'pileup', f'Variant mismatch between callers. Variant present in {caller_type}. Variant present in bcftools. Bcftools genotype chosen'])
         else:
             # TO DO: some indels may be still absent in bcftools, see if resolvable
-            log_buffer.append(f"[WARNING] Conflict at {variant_id}; absent in bcftools, dropping this variant")
+            log_buffer.append(['[WARNING]', variant_id, 'Discarded', 'pileup', f'Variant mismatch between callers. Variant present in {caller_type.upper()}. Variant absent in bcftools. Discarding this variant'])
         
     return resolved, log_buffer        
 
@@ -371,9 +371,8 @@ if __name__ == '__main__':
     resolved, log_buffer = compare_and_resolve(gt_vectors_all)
 
     # write logs 
-    with open(f'{args.output_prefix}.variant_conflict_resolution.log', 'w') as f: 
-        for i in log_buffer:
-            f.write(i + '\n')
+    log_buffer = pd.DataFrame(log_buffer, columns=['type', 'variant_id', 'verdict', 'correct_caller', 'details'])
+    log_buffer.to_csv(f'{args.output_prefix}.variant_conflict_resolution.log', sep='\t', index=None)
 
     resolved = resolved_to_frame(resolved)
     final_vcf = form_final_vcf(resolved, vcfs)
