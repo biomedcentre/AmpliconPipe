@@ -13,8 +13,16 @@ def read_vcf(link, mode):
     '''
     vcf = pd.read_csv(link, sep='\t', comment='#', header=None,
           names=['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', 'SAMPLE'], index_col=False)  
-    
-    contig_start = int(vcf['CHROM'][0].split(':')[-1].split('+')[0]) # TO DO: write more universal pattern function able to work with different contig namings
+
+
+    contig_name = vcf['CHROM'][0].split(':')[-1]
+    if '-' in contig_name:
+        contig_start = int(contig_name.split('-')[0])
+    elif '+' in contig_name: 
+        contig_start = int(contig_name.split('+')[0])
+    else: 
+        contig_start = int(contig_name)
+        
     vcf = vcf.assign(CHROM=vcf['CHROM'].map(lambda x: x.split(':')[0]),
                     POS=(vcf['POS'] + contig_start - 1).astype(int),
                     GT=vcf['SAMPLE'].map(lambda x: x.split(':')[0]).str.replace('|', '/', regex=False))
@@ -320,8 +328,14 @@ def restore_orig_coordinates(final_vcf, orig_link):
 
     orig_vcf = pd.read_csv(orig_link, sep='\t', comment='#', header=None,
           names=['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', 'SAMPLE'], index_col=False)  
-    
-    contig_start = int(orig_vcf['CHROM'][0].split(':')[-1].split('+')[0]) # написать функции детекции сепараторов или паттерны 
+
+    contig_name = orig_vcf['CHROM'][0].split(':')[-1]
+    if '-' in contig_name:
+        contig_start = int(contig_name.split('-')[0])
+    elif '+' in contig_name: 
+        contig_start = int(contig_name.split('+')[0])
+    else: 
+        contig_start = int(contig_name)
 
     final_vcf = final_vcf.assign(CHROM=orig_vcf['CHROM'].iloc[0],
                           POS=(final_vcf['POS'].astype(int) - contig_start + 1))
