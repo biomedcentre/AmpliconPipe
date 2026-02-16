@@ -193,7 +193,12 @@ def phase_variant_duo(patient, parent, phased_variants, variant_name):
 
 
 def process_inhereted_tab_to_hap_tab(ind_tab, block_id): 
-
+    '''
+    Function that forms haplotype tab from phased variants tab and adds proper block id (future PS tag) 
+    :param ind_tab: pd.DataFrame, phased variants frame for individual 
+    :param block_id: int, number of block = number of line in ped file
+    :return hap_tab: pd.DataFrame, ind_tab renamed and with block added  
+    '''
     hap_tab = []
 
     for idx, row in ind_tab.iterrows():
@@ -209,7 +214,13 @@ def process_inhereted_tab_to_hap_tab(ind_tab, block_id):
 
 
 def haplotype_append(hap_tab, ind_phased_haplotype, block_id): 
-
+    '''
+    Takes already phased haplotypes for individual and assesses if new phased variants can be used to extend already present blocks. Useful when more than one generation present/children from different parents are present 
+    :param hap_tab: pd.DataFrame, ind_tab renamed and with block added  
+    :param ind_phased_haplotype: pd.DataFrame, haplotypes with previously phased variants 
+    :param block_id: int, number of block = number of line in ped file
+    :return ind_phased_haplotype: pd.DataFrame, updated haplotypes 
+    '''
     # check presense of any phased variants in haplotypes 
     if (ind_phased_haplotype['block'].fillna(-1) != -1).any(): 
         already_phased = ind_phased_haplotype[ind_phased_haplotype['block'].fillna(-1) != -1]
@@ -236,7 +247,13 @@ def haplotype_append(hap_tab, ind_phased_haplotype, block_id):
 
 
 def assign_haplotypes_to_vcf(hap_tab, vcf): 
-
+    '''
+    Adds phasing info to vcf 
+    :param hap_tab: pd.DataFrame, phased haplotypes
+    :param vcf: pd.DataFrame, vcf read to pandas dataframe and processed 
+    :return vcf: pd.DataFrame, vcf updated with phasing info 
+    '''
+    
     hap_tab = hap_tab[hap_tab['block'] != -1]
 
     if hap_tab.empty: 
@@ -298,7 +315,6 @@ if __name__ == '__main__':
             if s != 'proxy':
                 samples.append(s)
     samples = list(set(samples)) 
-    print(samples)
 
     # read data and process vcfs into genotype dicts 
     vcfs, genotypes_extracted = {}, {}
@@ -348,7 +364,6 @@ if __name__ == '__main__':
 
             # transform variants to haplotype table
             phased_variants = pd.DataFrame(phased_variants).T
-            print(phased_variants)
              # if none phased, do not try to match haplotypes, just continue
             if phased_variants.empty: 
                 continue
@@ -367,3 +382,7 @@ if __name__ == '__main__':
         final_vcf = assign_haplotypes_to_vcf(phased_haplotypes[s], vcfs[s])
         final_vcf = restore_orig_coordinates(final_vcf, orig_link)
         write_vcf(vcf_comments, final_vcf, f'{args.output_prefix}/{s}.family.phased.vcf')
+
+    if args.container == 'docker':
+        subprocess.run(['chown', '-Rc', f':{args.gid}', os.path.dirname(args.output_prefix)], capture_output=True, text=True, check=True)
+    subprocess.run(['chmod', '-Rc', 'g+w,o-rwx', os.path.dirname(args.output_prefix)], capture_output=True, text=True, check=True)
