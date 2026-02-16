@@ -1,6 +1,14 @@
 import pandas as pd 
 import numpy as np
+import os
+import argparse
 import logging
+import sys
+
+components_location = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.append(os.path.join(components_location, 'resolve_conflicts'))
+
+from resolve_conflicts import get_vcf_comments, genotype_vectors, write_vcf, restore_orig_coordinates, form_comments_for_final_vcf
 
 def read_vcf(link): 
     '''
@@ -43,11 +51,11 @@ def extract_genotypes(vcf):
                 num = num+1
                 variant_id = str(row['POS']) + '_' + row['REF'] + "_" + alt
                 gt_relabled = row['GT'].split('/')
-                gt_relabeled = [int(g == str(num)) for g in gt_relabled]
+                gt_relabeled = [str(int(g == str(num))) for g in gt_relabled]
                 gt_vector[variant_id] = '/'.join(gt_relabeled).strip('/')
         else:
             variant_id = str(row['POS']) + '_' + row['REF'] + "_" + row['ALT']
-            gt_vector[variant_id] = gt
+            gt_vector[variant_id] = row['GT']
             
     return gt_vector
 
@@ -119,7 +127,7 @@ def phase_variant(patient, mother, father, phased_variants, variant_name):
         mother_phased['I'], mother_phased['N'] = mother_state // 2, max(mother_state // 2, mother_state % 2)
         father_phased['I'], father_phased['N'] = father_state // 2, max(father_state // 2, father_state % 2)
 
-     elif (patient_state == 2): 
+    elif (patient_state == 2): 
         # patient has homo, parents have homo or het 
         patient_phased['M'], patient_phased['F'] = 1, 1 
         mother_phased['I'], mother_phased['N'] = 1, mother_state // 2
@@ -189,12 +197,11 @@ def process_inhereted_tab_to_hap_tab(ind_tab, block_id):
     hap_tab = []
 
     for idx, row in ind_tab.iterrows():
-        if (row.sum() == 0) | (row.sum() == 1):
+        if (row.sum() == 0) | (row.sum() == 2):
             block = -1
         else: 
             block = block_id
-
-        hap_tab.append(row[0], row[1], block)
+        hap_tab.append([row.iloc[0], row.iloc[1], block])
 
     hap_tab = pd.DataFrame(hap_tab, index=ind_tab.index, columns=['hap1', 'hap2', 'block'])
     
@@ -206,7 +213,7 @@ def haplotype_append(hap_tab, ind_phased_haplotype, block_id):
     # check presense of any phased variants in haplotypes 
     if (ind_phased_haplotype['block'].fillna(-1) != -1).any(): 
         already_phased = ind_phased_haplotype[ind_phased_haplotype['block'].fillna(-1) != -1]
-        for al_ph, block in already_phased['block'].groupby('block'): 
+        for block, al_ph in already_phased.groupby('block'): 
             intersected_vars = hap_tab.index[hap_tab['block'] != -1].intersection(al_ph.index)
             if len(intersected_vars) > 0: # TO DO find proper contstant 
                 if (hap_tab.loc[intersected_vars]['hap1'] == al_ph.loc[intersected_vars]['hap1']).all():  # TO DO: find proper constant for match
@@ -217,6 +224,8 @@ def haplotype_append(hap_tab, ind_phased_haplotype, block_id):
                     break 
         else: 
             hap1, hap2, final_block = 'hap1', 'hap2', block_id 
+    else: 
+        hap1, hap2, final_block = 'hap1', 'hap2', block_id 
 
     for variant_id, row in hap_tab.iterrows():
         ind_phased_haplotype.loc[variant_id, hap1] = row['hap1']
@@ -225,13 +234,49 @@ def haplotype_append(hap_tab, ind_phased_haplotype, block_id):
 
     return ind_phased_haplotype
 
-def select_inhereted_h_from_paritialy_phased(patient, phased_mother, phased_father): 
-    # take all variants already phased 
-    # rephase 
-    # find matches 
+
+def assign_haplotypes_to_vcf(hap_tab, vcf): 
+
+    hap_tab = hap_tab[hap_tab['block'] != -1]
+
+    if hap_tab.empty: 
+        return vcf.drop(['GT'], axis=1)
+    
+    hap_tab['POS_REF'] = hap_tab.index.map(lambda x: '_'.join(x.split('_')[:-1]))
+    vcf['POS_REF'] = vcf['POS'].astype(str) + '_' + vcf['REF']
+    
+    for pos_ref, tab in hap_tab.groupby('POS_REF'): 
+        line_index = np.where(vcf['POS_REF'] == pos_ref)[0][0]
+        if len(tab) == 1: 
+            new_genotype = f"{tab.iloc[0]['hap1']}|{tab.iloc[0]['hap2']}"
+        else:
+            # take vcf row alt order, create mapping dict, create new genotype
+            map_dict = {alt:i+1 for i, alt in enumerate(vcf.loc[line_index]['ALT'].split(','))}
+            tab['ALT'] = tab.index.map(lambda x: map_dict[x.split('_')[-1]])
+            new_genotype = f"{(tab['ALT']*tab['hap1']).sum()}|{(tab['ALT']*tab['hap2']).sum()}"
+
+        vcf.loc[line_index, 'SAMPLE'] = vcf.loc[line_index, 'SAMPLE'].replace(vcf.loc[line_index, 'GT'], new_genotype) + f":{tab['block'][0]}"
+        vcf.loc[line_index, 'FORMAT'] = vcf.loc[line_index, 'FORMAT']  + ':PS'
+
+        #vcf.loc[line_index] = vcf_in_pos_line
+
+    return vcf.drop(['POS_REF', 'GT'], axis=1)
 
 
-def phase_variants(): 
+def form_comments_for_final_vcf(vcf_comments): 
+    '''
+    Forms new vcf header, combining headers of all used vcfs 
+    :param vcf_comments: dict, comments from all 3 vcfs 
+    :return comments: list, header of final vcf 
+    '''
+    comments = vcf_comments[:-1]
+    vcf_col_names = vcf_comments[-1] 
+
+    comments.append('##FORMAT=<ID=PS,Number=1,Type=Integer,Description="Phase set identifier">\n') # add line about PS 
+    comments.append(vcf_col_names)
+
+    return comments
+
 
 if __name__ == '__main__':  
 
@@ -249,16 +294,17 @@ if __name__ == '__main__':
     # find all samples
     samples = []
     for line in ped_file.to_numpy(): 
-        for s in line: 
+        for s in line[1:-2]: 
             if s != 'proxy':
                 samples.append(s)
     samples = list(set(samples)) 
+    print(samples)
 
     # read data and process vcfs into genotype dicts 
     vcfs, genotypes_extracted = {}, {}
     all_variants = []
     for s in samples: 
-        vcfs[s] = read_vcf(os.path.join(input_folder, f'{s}{args.vcf_postfix}'))
+        vcfs[s] = read_vcf(os.path.join(args.input_folder, f'{s}{args.vcf_postfix}'))
         genotypes_extracted[s] = extract_genotypes(vcfs[s])
         all_variants = all_variants + list(genotypes_extracted[s].keys())
 
@@ -268,7 +314,7 @@ if __name__ == '__main__':
     phased_haplotypes = {s:pd.DataFrame([], columns=['hap1', 'hap2', 'block']) for s in samples}
     # iterate over trios in ped file, phase each trio, merge haplotypes with haplotypes from previous trios if possible 
     for block_id, row in ped_file.iterrows(): 
-        patient_id, mother_id, father_id = row[0], row[1], row[2] 
+        patient_id, mother_id, father_id = row[1], row[2], row[3] 
         if (mother_id != 'proxy') & (father_id != 'proxy'):
 
             # phase variants in trio 
@@ -277,7 +323,12 @@ if __name__ == '__main__':
                 phased_variants = phase_variant(return_genotype(variant_id, genotypes_extracted[patient_id]), return_genotype(variant_id, genotypes_extracted[mother_id]), return_genotype(variant_id, genotypes_extracted[father_id]), phased_variants, variant_id)
 
             # transform variants to haplotype table
-            phased_variants = pd.DataFrame(phased_variants)
+            phased_variants = pd.DataFrame(phased_variants).T
+
+            # if none phased, do not try to match haplotypes, just continue
+            if phased_variants.empty: 
+                continue
+            
             for placement, id_type in zip([[0, 1], [2, 3], [4, 5]], [patient_id, mother_id, father_id]):
                 id_tab = process_inhereted_tab_to_hap_tab(phased_variants[placement], block_id)
                 # append to already present haplotypes, if possible, if no intersections, simply will be added to table as new block  
@@ -293,17 +344,26 @@ if __name__ == '__main__':
             # phase variants with proxy
             phased_variants = {}
             for variant_id in all_variants: 
-                phased_variants = phase_variant_duo(return_genotype(variant_id, genotypes_extracted[patient_id]), return_genotype(variant_id, genotypes_extracted[parent_id]), phased_variants, variant_name)
+                phased_variants = phase_variant_duo(return_genotype(variant_id, genotypes_extracted[patient_id]), return_genotype(variant_id, genotypes_extracted[parent_id]), phased_variants, variant_id)
 
             # transform variants to haplotype table
-            phased_variants = pd.DataFrame(phased_variants)
+            phased_variants = pd.DataFrame(phased_variants).T
+            print(phased_variants)
+             # if none phased, do not try to match haplotypes, just continue
+            if phased_variants.empty: 
+                continue
+            
             for placement, id_type in zip([[0, 1], [2, 3]], [patient_id, parent_id]):
                 id_tab = process_inhereted_tab_to_hap_tab(phased_variants[placement], block_id)
                 # append to already present haplotypes, if possible, if no intersections, simply will be added to table as new block  
                 phased_haplotypes[id_type] = haplotype_append(id_tab, phased_haplotypes[id_type], block_id)
 
 
-    # modify vcfs with phased genotype and PS tag 
-    vcf_comments = '' # right function for samples
-    for sample in samples: 
-        print(phased_haplotypes[sample])
+    # modify vcfs with phased genotype and PS tag     
+    for s in samples: 
+        print(phased_haplotypes[s])
+        orig_link = os.path.join(args.input_folder, f'{s}{args.vcf_postfix}')
+        vcf_comments = form_comments_for_final_vcf(get_vcf_comments(orig_link))
+        final_vcf = assign_haplotypes_to_vcf(phased_haplotypes[s], vcfs[s])
+        final_vcf = restore_orig_coordinates(final_vcf, orig_link)
+        write_vcf(vcf_comments, final_vcf, f'{args.output_prefix}/{s}.family.phased.vcf')
