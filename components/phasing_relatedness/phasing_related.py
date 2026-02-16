@@ -20,9 +20,9 @@ def read_vcf(link):
     else: 
         contig_start = int(contig_name)
 
-     vcf = vcf.assign(CHROM=vcf['CHROM'].map(lambda x: x.split(':')[0]),
-                    POS=(vcf['POS'] + contig_start - 1).astype(int),
-                    GT=vcf['SAMPLE'].map(lambda x: x.split(':')[0]).str.replace('|', '/', regex=False))
+    vcf = vcf.assign(CHROM=vcf['CHROM'].map(lambda x: x.split(':')[0]),
+                    POS=vcf['POS'] + contig_start - 1,
+        GT=vcf['SAMPLE'].map(lambda x: x.split(':')[0]).str.replace('|', '/', regex=False))
 
     return vcf
 
@@ -58,6 +58,16 @@ def genotype_split(genotype):
     :param genotype: str, genotype 
     '''
     return [int(i) for i in genotype.split('/')]
+
+
+def return_genotype(variant_id, genotype_dict): 
+    '''
+    Utility that returns genotype from dict if it is present, and 0/0 genotype if none 
+    '''
+    if variant_id in genotype_dict: 
+        return genotype_dict[variant_id]
+    else: 
+        return '0/0'
 
 
 def phase_variant(patient, mother, father, phased_variants, variant_name): 
@@ -103,7 +113,7 @@ def phase_variant(patient, mother, father, phased_variants, variant_name):
         mother_phased['I'], father_phased['I'] = mother_state, father_state 
         mother_phased['N'], father_phased['N'] = 0, 0 
         
-    elif (patient_state == 1) & ((mother_state + father_state) > 1):
+    elif (patient_state == 1) & ((mother_state == 2) | (father_state == 2)):
         # patient has het, mother or father has homo, other may have het
         patient_phased['M'], patient_phased['F'] = mother_state // 2, father_state // 2 # will be 1 where homo, 0 where parent has hetero or 0 
         mother_phased['I'], mother_phased['N'] = mother_state // 2, max(mother_state // 2, mother_state % 2)
@@ -114,6 +124,9 @@ def phase_variant(patient, mother, father, phased_variants, variant_name):
         patient_phased['M'], patient_phased['F'] = 1, 1 
         mother_phased['I'], mother_phased['N'] = 1, mother_state // 2
         father_phased['I'], father_phased['N'] = 1, father_state // 2
+         
+    else: 
+        if_phased = False
 
     # if phasing sucessful, update table of phased variants 
     if if_phased: 
@@ -171,6 +184,47 @@ def phase_variant_duo(patient, parent, phased_variants, variant_name):
     return phased_variants 
 
 
+def process_inhereted_tab_to_hap_tab(ind_tab, block_id): 
+
+    hap_tab = []
+
+    for idx, row in ind_tab.iterrows():
+        if (row.sum() == 0) | (row.sum() == 1):
+            block = -1
+        else: 
+            block = block_id
+
+        hap_tab.append(row[0], row[1], block)
+
+    hap_tab = pd.DataFrame(hap_tab, index=ind_tab.index, columns=['hap1', 'hap2', 'block'])
+    
+    return hap_tab 
+
+
+def haplotype_append(hap_tab, ind_phased_haplotype, block_id): 
+
+    # check presense of any phased variants in haplotypes 
+    if (ind_phased_haplotype['block'].fillna(-1) != -1).any(): 
+        already_phased = ind_phased_haplotype[ind_phased_haplotype['block'].fillna(-1) != -1]
+        for al_ph, block in already_phased['block'].groupby('block'): 
+            intersected_vars = hap_tab.index[hap_tab['block'] != -1].intersection(al_ph.index)
+            if len(intersected_vars) > 0: # TO DO find proper contstant 
+                if (hap_tab.loc[intersected_vars]['hap1'] == al_ph.loc[intersected_vars]['hap1']).all():  # TO DO: find proper constant for match
+                    hap1, hap2, final_block = 'hap1', 'hap2', block
+                    break
+                elif (hap_tab.loc[intersected_vars]['hap2'] == al_ph.loc[intersected_vars]['hap1']).all(): 
+                    hap1, hap2, final_block = 'hap2', 'hap1', block
+                    break 
+        else: 
+            hap1, hap2, final_block = 'hap1', 'hap2', block_id 
+
+    for variant_id, row in hap_tab.iterrows():
+        ind_phased_haplotype.loc[variant_id, hap1] = row['hap1']
+        ind_phased_haplotype.loc[variant_id, hap2] = row['hap2']
+        ind_phased_haplotype.loc[variant_id, 'block'] = final_block if row['hap1'] != row['hap2'] else -1 
+
+    return ind_phased_haplotype
+
 def select_inhereted_h_from_paritialy_phased(patient, phased_mother, phased_father): 
     # take all variants already phased 
     # rephase 
@@ -196,10 +250,11 @@ if __name__ == '__main__':
     samples = []
     for line in ped_file.to_numpy(): 
         for s in line: 
-            samples.append(s)
-    samples = list(set(samples)) # add removal of "proxy" sample 
+            if s != 'proxy':
+                samples.append(s)
+    samples = list(set(samples)) 
 
-    # read data 
+    # read data and process vcfs into genotype dicts 
     vcfs, genotypes_extracted = {}, {}
     all_variants = []
     for s in samples: 
@@ -209,37 +264,46 @@ if __name__ == '__main__':
 
     all_variants = list(set(all_variants))
 
-    phased_haplotypes = {s:pd.DataFrame([], columns=['hap1', 'hap2']) for s in samples}
-    for idx, row in ped_file.iterrows(): 
+    # create empty tab of haplotypes 
+    phased_haplotypes = {s:pd.DataFrame([], columns=['hap1', 'hap2', 'block']) for s in samples}
+    # iterate over trios in ped file, phase each trio, merge haplotypes with haplotypes from previous trios if possible 
+    for block_id, row in ped_file.iterrows(): 
         patient_id, mother_id, father_id = row[0], row[1], row[2] 
         if (mother_id != 'proxy') & (father_id != 'proxy'):
-            # check if any haplotypes of mother and father are already phased 
-            if (len(phased_haplotypes[mother_id]) > 0) | (len(phased_haplotypes[father_id]) > 0): 
-                # write procedure for haplotype selection here 
-                select_inhereted_h_from_paritialy_phased()
-                # determine inherited for mother and father 
-                # phase only variants in patient for variants in parents that are already phased 
-                
-            phased_variants = {}
-            for variant_id in genotypes_extracted[patient_id]: 
-                if variant_id not in all_variants: 
-                    phased_variants = phase_variant(genotypes_extracted[patient_id][variant_id], genotypes_extracted[mother_id][variant_id], genotypes_extracted[father_id][variant_id], phased_variants, variant_id)
 
+            # phase variants in trio 
+            phased_variants = {}
+            for variant_id in all_variants: 
+                phased_variants = phase_variant(return_genotype(variant_id, genotypes_extracted[patient_id]), return_genotype(variant_id, genotypes_extracted[mother_id]), return_genotype(variant_id, genotypes_extracted[father_id]), phased_variants, variant_id)
+
+            # transform variants to haplotype table
+            phased_variants = pd.DataFrame(phased_variants)
+            for placement, id_type in zip([[0, 1], [2, 3], [4, 5]], [patient_id, mother_id, father_id]):
+                id_tab = process_inhereted_tab_to_hap_tab(phased_variants[placement], block_id)
+                # append to already present haplotypes, if possible, if no intersections, simply will be added to table as new block  
+                phased_haplotypes[id_type] = haplotype_append(id_tab, phased_haplotypes[id_type], block_id)
+            
         else: 
             # proxy present 
-            # check if any haplotypes of mother and father are already phased 
             if mother_id != 'proxy': 
                 parent_id = mother_id
             else: 
                 parent_id = father_id
-            
-            if len(phased_haplotypes[parent_id]) > 0: 
-                # write procedure for haplotype selection here 
-                select_inhereted_h_from_paritialy_phased()
-                # determine inherited for mother and father 
-                # phase only variants in patient for variants in parents that are already phased 
-                
+
+            # phase variants with proxy
             phased_variants = {}
-            for variant_id in genotypes_extracted[patient_id]: 
-                if variant_id not in all_variants: 
-                    phased_variants = phase_variant_duo(genotypes_extracted[patient_id][variant_id], genotypes_extracted[parent_id][variant_id], phased_variants, variant_name)
+            for variant_id in all_variants: 
+                phased_variants = phase_variant_duo(return_genotype(variant_id, genotypes_extracted[patient_id]), return_genotype(variant_id, genotypes_extracted[parent_id]), phased_variants, variant_name)
+
+            # transform variants to haplotype table
+            phased_variants = pd.DataFrame(phased_variants)
+            for placement, id_type in zip([[0, 1], [2, 3]], [patient_id, parent_id]):
+                id_tab = process_inhereted_tab_to_hap_tab(phased_variants[placement], block_id)
+                # append to already present haplotypes, if possible, if no intersections, simply will be added to table as new block  
+                phased_haplotypes[id_type] = haplotype_append(id_tab, phased_haplotypes[id_type], block_id)
+
+
+    # modify vcfs with phased genotype and PS tag 
+    vcf_comments = '' # right function for samples
+    for sample in samples: 
+        print(phased_haplotypes[sample])
