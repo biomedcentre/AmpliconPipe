@@ -305,7 +305,7 @@ def form_comments_for_final_vcf(vcf_comments):
 
 def ploidy_check(ids_list, ploidy):
     
-    if all([ploidy[s] == 1 for s in ids_list]) # all have deletion, cis-trans phasing not applicable to any
+    if all([ploidy[s] == 1 for s in ids_list]): # all have deletion, cis-trans phasing not applicable to any
         return 'continue'
 
     elif ploidy[ids_list[0]] != 1: # patient does not have deletion, one of parents may have deletion, phasing may proceeed as normal
@@ -321,8 +321,8 @@ def ploidy_check(ids_list, ploidy):
 def assess_mismatches(all_variants, patient_genotype, parent_genotype): 
     mismatches = 0
     for variant_id in all_variants: 
-        patient_state = return_genotype(variant_id, genotypes_extracted[patient_id]) // 2 # 1 if hemizygous 
-        parent_state = return_genotype(variant_id, genotypes_extracted[parent_id])
+        patient_state = genotype_split(return_genotype(variant_id, genotypes_extracted[patient_id])).sum() // 2 # 1 if hemizygous 
+        parent_state = genotype_split(return_genotype(variant_id, genotypes_extracted[parent_id])).sum()
         if patient_state > parent_state: 
             mismatches += 1
     return mismatches 
@@ -338,7 +338,7 @@ def determine_deletions_source(ids_list, genotypes_extracted, all_variants, ploi
     else:
         patient_id, mother_id, father_id = ids_list[0], ids_list[1], ids_list[2]
         mother_mismatch = assess_mismatches(all_variants, genotypes_extracted[patient_id], genotypes_extracted[mother_id])
-        father_mismatch = assess_mismatches(all_variants, genotypes_extracted[patient_id], genotypes_extracted[father_id]])
+        father_mismatch = assess_mismatches(all_variants, genotypes_extracted[patient_id], genotypes_extracted[father_id])
         
         if father_mismatch > mother_mistmatch: 
             deletion_source = father_id
@@ -402,7 +402,7 @@ if __name__ == '__main__':
         
         if (mother_id != 'proxy') & (father_id != 'proxy'):
             
-            haplotype_zip = ([[0, 1], [2, 3], [4, 5]], [patient_id, mother_id, father_id])
+            placement_dict = {'patient': patient_id, 'mother': mother_id, 'father': father_id}
             pl_ch = ploidy_check([patient_id, mother_id, father_id], ploidy)
 
             if pl_ch == 'continue': # if all have deletion, nothing to phase 
@@ -423,16 +423,22 @@ if __name__ == '__main__':
                                                 return_genotype(variant_id, genotypes_extracted[mother_id], 
                                                                 is_deletion_source=(mother_id == deletion_source)),
                                                 return_genotype(variant_id, genotypes_extracted[father_id],
-                                                                is_deletion_source=(father_id == deletion_source))),
+                                                                is_deletion_source=(father_id == deletion_source)),
                                                 phased_variants, variant_id)
+
+            phased_variants = pd.DataFrame(phased_variants, index=['patient_1', 'patient_2', 'mother_1', 'mother_2', 'father_1', 'father_2']).T 
+            # if deletion was present, remove deletion source and patient from haplotypes since they are not phasable anyway  
+            if pl_ch == 'match copy strategy':
+                drop_relative = 'mother' if deletion_source == mother_id else 'father'
+                phased_variants = phased_variants.drop(['patient_1', 'patient_2', f'{drop_relative}_1', f'{drop_relative}_2'], axis=1)
             
             
         else: 
             # proxy present 
             parent_id = mother_id if mother_id != 'proxy' else father_id
-            haplotype_zip = ([[0, 1], [2, 3]], [patient_id, parent_id])
+            placement_dict = {'patient': patient_id, 'parent': parent_id}
 
-            pl_ch = ploidy_check([patient_id, mother_id, father_id], ploidy)
+            pl_ch = ploidy_check([patient_id, parent_id], ploidy)
 
             if pl_ch == 'continue': # if all have deletion, nothing to phase 
                 continue
@@ -451,19 +457,25 @@ if __name__ == '__main__':
                                                                         is_patient_with_deletion=is_patient_with_deletion),
                                                         return_genotype(variant_id, genotypes_extracted[parent_id],
                                                                         is_deletion_source=(parent_id == deletion_source)), phased_variants, variant_id)
-
-        # transform variants to haplotype table
-        phased_variants = pd.DataFrame(phased_variants).T
+                
+            phased_variants = pd.DataFrame(phased_variants, index=['patient_1', 'patient_2', 'parent_1', 'parent_2', 'proxy_1', 'proxy_2']).T 
+            # if deletion was present, remove deletion source and patient from haplotypes since they are not phasable anyway  
+            if pl_ch == 'match copy strategy':
+                drop_relative = 'parent' if deletion_source == parent_id else 'proxy'
+                phased_variants = phased_variants.drop(['patient_1', 'patient_2', f'{drop_relative}_1', f'{drop_relative}_2'], axis=1)
+        
         
         # if none phased, do not try to match haplotypes, just continue
         if phased_variants.empty: 
             continue
-        
-        for placement, id_type in zip(haplotype_zip):
-            id_tab = process_inhereted_tab_to_hap_tab(phased_variants[placement], block_id)
-            # append to already present haplotypes, if possible, if no intersections, simply will be added to table as new block  
-            phased_haplotypes[id_type] = haplotype_append(id_tab, phased_haplotypes[id_type], block_id)
 
+        for placement in phased_variants.columns.map(lambda x: x.split('_')[0]).unique():
+            if placement != 'proxy':
+                id_tab = process_inhereted_tab_to_hap_tab(phased_variants[[f'{placement}_1', f'{placement}_2']], block_id)
+                # append to already present haplotypes, if possible, if no intersections, simply will be added to table as new block  
+                phased_haplotypes[placement_dict[placement]] = haplotype_append(id_tab, phased_haplotypes[placement_dict[placement]], block_id)
+
+    
     # modify vcfs with phased genotype and PS tag     
     for s in samples: 
         print(phased_haplotypes[s])
