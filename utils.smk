@@ -23,6 +23,10 @@ if config['references']['full_genome']:
 # input output 
 input_folder = config['input']['input_folder']
 output_folder = config['output']['output_folder']
+ped_file = config['input']['ped_file']
+if ped_file:
+    ped_folder = os.path.dirname(config['input']['ped_file'])
+    ped_name = os.path.basename(config['input']['ped_file'])
 
 
 # settings 
@@ -168,3 +172,56 @@ def get_full_container(container_name):
         return os.path.join(rep_location, 'singularity_images', f'{container_name}.sif')
     else:
         return f'amppipe/{container_name}'
+
+
+def get_families(wildcards, ped_file): 
+    '''
+    Gets families available for phasing in ped files (has trios that do not have ploidy 3). Requires ploidy qc done 
+    :param wildcards: Snakemake wildcards
+    :param ped_file: 
+    '''
+    good_trios = []
+    with open(ped_file, 'r') as f: 
+        for line in f: 
+            line = line.split('\t')
+
+            samples = []
+            for s in line[1:-2]: 
+            if s != 'proxy':
+                samples.append(s)
+
+            good_ploidies = []
+            for s in samples:
+                with checkpoints.PloidyContaminationQC.get(sample=s).output.qc_result.open() as file:
+                    pl_line = file.readlines()[1].strip('\n').split('\t')
+                    if (pl_line[-2] != "[CRITICAL]"): 
+                        if int(pl_line[-4]) <= 2:
+                            good_ploidies.append(s) 
+
+            if len(samples) == len(good_ploidies): 
+                good_trios.append(line[0]) 
+
+    return list(set(good_trios))
+
+
+def samples_in_family(wildcards, ped_file): 
+    '''
+    Gets samples in family that can be phased (quality not critical and have ploidy not 3
+    :param wildcards: Snakemake wildcards
+    :param ped_file: supplied full ped file
+    '''
+     with open(ped_file, 'r') as f: 
+        samples = []
+        for line in f: 
+            line = line.split('\t')
+            if line [0] == wildcards.family: 
+                for s in line[1:-2]: 
+                    if s != 'proxy':
+                    with checkpoints.PloidyContaminationQC.get(sample=s).output.qc_result.open() as file:
+                    pl_line = file.readlines()[1].strip('\n').split('\t')
+                    if (pl_line[-2] != "[CRITICAL]"): 
+                        if int(pl_line[-4]) <= 2:
+                            samples.append(s)
+
+    return list(set(samples)) 
+    

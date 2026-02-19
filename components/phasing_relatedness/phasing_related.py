@@ -1,9 +1,11 @@
-import pandas as pd 
-import numpy as np
 import os
 import argparse
 import logging
 import sys
+import subprocess 
+import pandas as pd 
+import numpy as np
+
 
 components_location = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(os.path.join(components_location, 'resolve_conflicts'))
@@ -321,8 +323,8 @@ def ploidy_check(ids_list, ploidy):
 def assess_mismatches(all_variants, patient_genotype, parent_genotype): 
     mismatches = 0
     for variant_id in all_variants: 
-        patient_state = genotype_split(return_genotype(variant_id, genotypes_extracted[patient_id])).sum() // 2 # 1 if hemizygous 
-        parent_state = genotype_split(return_genotype(variant_id, genotypes_extracted[parent_id])).sum()
+        patient_state = sum(genotype_split(return_genotype(variant_id, patient_genotype))) // 2 # 1 if hemizygous 
+        parent_state = sum(genotype_split(return_genotype(variant_id, parent_genotype)))
         if patient_state > parent_state: 
             mismatches += 1
     return mismatches 
@@ -340,9 +342,9 @@ def determine_deletions_source(ids_list, genotypes_extracted, all_variants, ploi
         mother_mismatch = assess_mismatches(all_variants, genotypes_extracted[patient_id], genotypes_extracted[mother_id])
         father_mismatch = assess_mismatches(all_variants, genotypes_extracted[patient_id], genotypes_extracted[father_id])
         
-        if father_mismatch > mother_mistmatch: 
+        if father_mismatch > mother_mismatch: 
             deletion_source = father_id
-        elif father_mismatch < mother_mistmatch:
+        elif father_mismatch < mother_mismatch:
             deletion_source = mother_id
         else: 
             if ploidy[father_id] == 1: 
@@ -363,12 +365,14 @@ if __name__ == '__main__':
     parser.add_argument('--vcf_postfix', type=str, help='Vcf postfix', default='.conflict.resolved.vcf.gz')
     parser.add_argument('--contamination_postfix', type=str, help='Vcf postfix', default='.contamination_ploidy_results_mqc.txt')
     parser.add_argument('--ped_file', type=str, help='Prepared ped file with relatedness', required=True)
+    parser.add_argument('--family', type=str, help='Family id in ped file', required=True)
     parser.add_argument('--output_prefix', type=str, help='Output_prefix', required=True)
     parser.add_argument('--gid', type=str, default='0')
     parser.add_argument('--container', type=str, default='singularity')
     args = parser.parse_args()
 
     ped_file = pd.read_csv(args.ped_file, sep='\t', header=None, index_col=None)
+    ped_file = ped_file[ped_file[0].astype(str).isin(family)]
 
     # find all samples
     samples = []
@@ -478,12 +482,16 @@ if __name__ == '__main__':
     
     # modify vcfs with phased genotype and PS tag     
     for s in samples: 
-        print(phased_haplotypes[s])
+        print(s)
+        print(phased_haplotypes[s].sort_index())
         orig_link = os.path.join(args.input_folder, f'{s}{args.vcf_postfix}')
         vcf_comments = form_comments_for_final_vcf(get_vcf_comments(orig_link))
         final_vcf = assign_haplotypes_to_vcf(phased_haplotypes[s], vcfs[s])
         final_vcf = restore_orig_coordinates(final_vcf, orig_link)
         write_vcf(vcf_comments, final_vcf, f'{args.output_prefix}/{s}.family.phased.vcf')
+
+    # temp output save 
+    ped_file.to_csv(os.path.join(args.input_folder, f'{family}.family.ped.txt'))
 
     if args.container == 'docker':
         subprocess.run(['chown', '-Rc', f':{args.gid}', os.path.dirname(args.output_prefix)], capture_output=True, text=True, check=True)

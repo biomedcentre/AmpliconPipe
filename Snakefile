@@ -7,13 +7,14 @@ wildcard_constraints:
 
 samples = get_sample_names(input_folder)
 print(samples)
-
+families = get_families(ped_file)
 
 rule all: 
     input: 
         expand(os.path.join(output_folder, "{sample}.contamination_ploidy_results_mqc.txt"), sample=samples),
         expand(os.path.join(output_folder, "{sample}.phased.vcf.gz"), sample=samples),
-        expand(os.path.join(output_folder, "{sample}.multiqc.html"), sample=samples)
+        expand(os.path.join(output_folder, "{sample}.multiqc.html"), sample=samples), 
+        expand(os.path.join(output_folder, "{family}.family.ped.txt"), family=families) if family_phasing else []
         
 
 rule fastq2bam:
@@ -434,6 +435,33 @@ rule whatshap_polyphase:
         bash /pipeline/tools/components/whatshapAltPloidy/whatshap_polyphase.sh /pipeline/reference/{reference_name} /pipeline/input/{wildcards.sample}.sorted.dedup.bam  /pipeline/output/{wildcards.sample}.alt.ploidy.quality.checked.vcf {threads} 3 --container {container_type}
         '''
 
+
+rule relatedness_phasing: 
+    threads: int(config['rules_settings']['relatedness_phasing']['cpus_per_task'])
+    resources: 
+        runtime =  int(config['rules_settings']['relatedness_phasing']['runtime']),
+        mem_mb =  int(config['rules_settings']['relatedness_phasing']['mem_mb']),
+        cpus_per_task = int(config['rules_settings']['relatedness_phasing']['cpus_per_task'])
+    input:
+        expand(os.path.join(output_folder, "{sample_f}.contamination_ploidy_results_mqc.txt"), sample_f=samples_in_family(wildcards, ped_file)),
+        expand(os.path.join(output_folder, "{sample_f}.conflict.resolved.vcf"), sample_f=samples_in_family(wildcards, ped_file)),
+    output:
+        temp(os.path.join(output_folder, "{family}.family.ped.txt")),
+        expand(os.path.join(output_folder, "{sample_f}.family.phased.vcf"), sample_f=samples_in_family(wildcards, ped_file))
+    params: 
+        container_name = get_full_container('python_and_whatshap')
+    shell: 
+        '''
+        {container_run_command} \
+        {bind} {output_folder}:/pipeline/input:ro \
+        {bind} {rep_location}/components:/pipeline/tools/components:ro \
+        {bind} {output_folder}:/pipeline/output \
+        {bind} {ped_folder}:/pipeline/reference:ro \
+        {env} GID={GID} {params.container_name} \
+        bash /pipeline/tools/components/phasing_relatedness/phasing_related.py --input_folder /pipeline/input --family {wildcards.family} \
+        --ped_file /pipeline/reference/{ped_name} --output_prefix /pipeline/output --container {container_type}
+        '''
+        
 
 rule multiqc: 
     threads: int(config['rules_settings']['multiqc']['cpus_per_task'])

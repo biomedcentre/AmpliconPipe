@@ -2,13 +2,14 @@
 
 input:
     input_folder: '/primary/data/seqfacility/fastq/20027-fastq/SEQ-170' # input folder with raw fastq files 
-    include_patterns: ['SMN1']  # list of patterns or sample names to include, e.g. ['CYP21A2', 'SEQ[1,6]'] 
+    include_patterns: []  # list of patterns or sample names to include, e.g. ['CYP21A2', 'SEQ[1,6]']. if empty, all are included 
     exclude_patterns: [] # list of patterns or sample names to exclude, e.g. ['SAMPLE_1', 'SEQ[2,7]']
     fastq_extensions: ['fastq.gz', 'fq.gz']
+    ped_file: # OPTIONAL ped file that will be used for relatedness phasing 
 
 # ===== OUTPUT SETTINGS ====         
 output:
-    output_folder: '/primary/data/zantysheva/projects/sma/20027-fastq-SMN1-test-pipe-recalc'
+    output_folder: '/primary/data/common/VDKN/VDKN_amplicons_full_cohort_recalculated/2026-02-10_VDKN_amplicons'
     save_all_callers: True
     # True or False 
     # this flag is used to mark if all callers outputs should be preserved, or only conflict resolved output should be saved 
@@ -16,9 +17,9 @@ output:
 # ===== REFERENCE SETTINGS ====  
 
 references: 
-    amplicon: '/primary/data/zantysheva/git_clones/AmpliconPipe/reference/SMN1/SMN1.fasta' # Amplicon fasta .fasta
-    amplicon_bed: '/primary/data/zantysheva/git_clones/AmpliconPipe/reference/SMN1/SMN1.bed' # bed file for calling interval. Can be the all amplicon span
-    pseudogene_coordinates: 'chr5:70048839-70077462' # OPTIONAL. If the amplicon has highly homological sequence in genome (>=90%) e.g. CYP21A1P for CYP21A2, CYP2D7 for CYP2D6, SMN2 for SMN1, coordinates can be given to check contamination from this region specifically. Better performance is achieved if coordinates for homological region include all the length of homological region in amplicon, not only gene or pseudogene. Adding extra ~1000 b.p on sides also can help 
+    amplicon: '/primary/data/zantysheva/git_clones/AmpliconPipe/reference/CYP21A2/CYP21A2-amp_hg38.fasta' # Amplicon fasta .fasta
+    amplicon_bed: '/primary/data/zantysheva/git_clones/AmpliconPipe/reference/CYP21A2/CYP21A2.bed' # bed file for calling interval. Can be the all amplicon span
+    pseudogene_coordinates: 'chr6:32005689-32008399' # OPTIONAL. If the amplicon has highly homological sequence in genome (>=90%) e.g. CYP21A1P for CYP21A2, CYP2D7 for CYP2D6, SMN2 for SMN1, coordinates can be given to check contamination from this region specifically. Better performance is achieved if coordinates for homological region include all the length of homological region in amplicon, not only gene or pseudogene. Adding extra ~1000 b.p on sides also can help 
     full_genome: '/primary/data/zantysheva/data/reference/Homo_sapiens_assembly38/Homo_sapiens_assembly38.fasta' # OPTIONAL. full reference sequence of the organism. Required only if pseudogene coordinates are given 
 
 
@@ -117,6 +118,11 @@ rules_settings:
         runtime: 48000 
         mem_mb: 15000
         cpus_per_task: 15
+
+    relatedness_phasing:
+        runtime: 100
+        mem_mb: 500
+        cpus_per_task: 2
 
     multiqc: 
         runtime: 200
