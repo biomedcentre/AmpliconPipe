@@ -6,7 +6,6 @@ import subprocess
 import pandas as pd 
 import numpy as np
 
-
 components_location = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(os.path.join(components_location, 'resolve_conflicts'))
 
@@ -372,7 +371,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     ped_file = pd.read_csv(args.ped_file, sep='\t', header=None, index_col=None)
-    ped_file = ped_file[ped_file[0].astype(str).isin(family)]
+    ped_file = ped_file[ped_file[0].astype(str) == args.family]
 
     # find all samples
     samples = []
@@ -396,7 +395,21 @@ if __name__ == '__main__':
     ploidy = {}
     for s in samples: 
         ploidy[s] = pd.read_csv(os.path.join(args.input_folder, f'{s}{args.contamination_postfix}'), sep='\t')['ploidy'].iloc[0]
-        
+
+    # remove ped file lines that contain ploidy 3 samples
+    drop_index = []
+    for block_id, row in ped_file.iterrows(): 
+        for s in row.loc[1:3]:
+            if s in ploidy.keys():
+                if (ploidy[s] != 2) & (ploidy[s] != 1): 
+                    drop_index.append(block_id)
+                    break
+
+    ped_file =  ped_file.drop(drop_index)
+    if ped_file.empty: 
+        ped_file.to_csv(os.path.join(args.input_folder, f'{family}.family.ped.txt'))
+        sys.exit()
+    
     # create empty tab of haplotypes 
     phased_haplotypes = {s:pd.DataFrame([], columns=['hap1', 'hap2', 'block']) for s in samples}
     
@@ -491,8 +504,8 @@ if __name__ == '__main__':
         write_vcf(vcf_comments, final_vcf, f'{args.output_prefix}/{s}.family.phased.vcf')
 
     # temp output save 
-    ped_file.to_csv(os.path.join(args.input_folder, f'{family}.family.ped.txt'))
+    ped_file.to_csv(os.path.join(args.output_prefix, f'{args.family}.family.ped.txt'))
 
     if args.container == 'docker':
-        subprocess.run(['chown', '-Rc', f':{args.gid}', os.path.dirname(args.output_prefix)], capture_output=True, text=True, check=True)
-    subprocess.run(['chmod', '-Rc', 'g+w,o-rwx', os.path.dirname(args.output_prefix)], capture_output=True, text=True, check=True)
+        subprocess.run(['chown', '-Rc', f':{args.gid}', args.output_prefix], capture_output=True, text=True, check=True)
+    subprocess.run(['chmod', '-Rc', 'g+w,o-rwx', args.output_prefix], capture_output=True, text=True, check=True)

@@ -174,34 +174,19 @@ def get_full_container(container_name):
         return f'amppipe/{container_name}'
 
 
-def get_families(wildcards, ped_file): 
+def get_families(ped_file): 
     '''
     Gets families available for phasing in ped files (has trios that do not have ploidy 3). Requires ploidy qc done 
     :param wildcards: Snakemake wildcards
     :param ped_file: 
     '''
-    good_trios = []
+    trios = []
     with open(ped_file, 'r') as f: 
         for line in f: 
             line = line.split('\t')
-
-            samples = []
-            for s in line[1:-2]: 
-            if s != 'proxy':
-                samples.append(s)
-
-            good_ploidies = []
-            for s in samples:
-                with checkpoints.PloidyContaminationQC.get(sample=s).output.qc_result.open() as file:
-                    pl_line = file.readlines()[1].strip('\n').split('\t')
-                    if (pl_line[-2] != "[CRITICAL]"): 
-                        if int(pl_line[-4]) <= 2:
-                            good_ploidies.append(s) 
-
-            if len(samples) == len(good_ploidies): 
-                good_trios.append(line[0]) 
-
-    return list(set(good_trios))
+            trios.append(line[0]) 
+   
+    return list(set(trios))
 
 
 def samples_in_family(wildcards, ped_file): 
@@ -210,18 +195,32 @@ def samples_in_family(wildcards, ped_file):
     :param wildcards: Snakemake wildcards
     :param ped_file: supplied full ped file
     '''
-     with open(ped_file, 'r') as f: 
-        samples = []
+    # find lines from family
+    with open(ped_file, 'r') as f: 
+        family_lines = []
         for line in f: 
             line = line.split('\t')
-            if line [0] == wildcards.family: 
-                for s in line[1:-2]: 
-                    if s != 'proxy':
-                    with checkpoints.PloidyContaminationQC.get(sample=s).output.qc_result.open() as file:
+            if line[0] == wildcards.family:
+                family_lines.append(line)
+
+    samples = []
+    for line in family_lines:
+        for s in line[1:-2]: 
+            if s != 'proxy':
+                with checkpoints.PloidyContaminationQC.get(sample=s).output.qc_result.open() as file:
                     pl_line = file.readlines()[1].strip('\n').split('\t')
                     if (pl_line[-2] != "[CRITICAL]"): 
                         if int(pl_line[-4]) <= 2:
                             samples.append(s)
 
     return list(set(samples)) 
-    
+
+
+def gen_input_for_family(wildcards, ped_file): 
+
+    samples = samples_in_family(wildcards, ped_file)
+
+    input = expand(os.path.join(output_folder, "{sample_f}.contamination_ploidy_results_mqc.txt"), sample_f=samples) + \
+    expand(os.path.join(output_folder, "{sample_f}.conflict.resolved.vcf.gz"), sample_f=samples)
+
+    return input

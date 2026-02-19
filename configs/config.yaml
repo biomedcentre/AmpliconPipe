@@ -1,15 +1,15 @@
 # ===== INPUT SETTINGS ==== 
 
 input:
-    input_folder: '/primary/data/seqfacility/fastq/20027-fastq/SEQ-170' # input folder with raw fastq files 
+    input_folder: '/primary/data/common/VDKN/paper_diagnostics_amps/paper_diagnostics_amps_RAW/phasing_test_RAW/' # input folder with raw fastq files 
     include_patterns: []  # list of patterns or sample names to include, e.g. ['CYP21A2', 'SEQ[1,6]']. if empty, all are included 
     exclude_patterns: [] # list of patterns or sample names to exclude, e.g. ['SAMPLE_1', 'SEQ[2,7]']
     fastq_extensions: ['fastq.gz', 'fq.gz']
-    ped_file: # OPTIONAL ped file that will be used for relatedness phasing 
+    ped_file: '/primary/data/zantysheva/projects/vdkn/ped_test_l1.tsv' # OPTIONAL ped file that will be used for relatedness phasing 
 
 # ===== OUTPUT SETTINGS ====         
 output:
-    output_folder: '/primary/data/common/VDKN/VDKN_amplicons_full_cohort_recalculated/2026-02-10_VDKN_amplicons'
+    output_folder: '/primary/data/common/VDKN/paper_diagnostics_amps/phasing_test'
     save_all_callers: True
     # True or False 
     # this flag is used to mark if all callers outputs should be preserved, or only conflict resolved output should be saved 

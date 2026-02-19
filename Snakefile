@@ -7,21 +7,20 @@ wildcard_constraints:
 
 samples = get_sample_names(input_folder)
 print(samples)
-families = get_families(ped_file)
 
 rule all: 
     input: 
         expand(os.path.join(output_folder, "{sample}.contamination_ploidy_results_mqc.txt"), sample=samples),
         expand(os.path.join(output_folder, "{sample}.phased.vcf.gz"), sample=samples),
         expand(os.path.join(output_folder, "{sample}.multiqc.html"), sample=samples), 
-        expand(os.path.join(output_folder, "{family}.family.ped.txt"), family=families) if family_phasing else []
-        
+        expand(os.path.join(output_folder, "{family}.family.ped.txt"), family=get_families(ped_file)) if ped_file is not None else []
+
 
 rule fastq2bam:
     threads: int(config['rules_settings']['fastq2bam']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['fastq2bam']['runtime']),
-        mem_mb =  int(config['rules_settings']['fastq2bam']['mem_mb']),
+        runtime = int(config['rules_settings']['fastq2bam']['runtime']),
+        mem_mb = int(config['rules_settings']['fastq2bam']['mem_mb']),
         cpus_per_task =  int(config['rules_settings']['fastq2bam']['cpus_per_task'])
     input: 
         r1 = lambda wildcards: get_fastq_input(wildcards, input_folder, 'R1'),
@@ -54,8 +53,8 @@ rule fastq2bam:
 rule HaplotypeCaller: 
     threads: int(config['rules_settings']['HaplotypeCaller']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['HaplotypeCaller']['runtime']),
-        mem_mb =  int(config['rules_settings']['HaplotypeCaller']['mem_mb']),
+        runtime = int(config['rules_settings']['HaplotypeCaller']['runtime']),
+        mem_mb = int(config['rules_settings']['HaplotypeCaller']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['HaplotypeCaller']['cpus_per_task'])
     input: 
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
@@ -81,8 +80,8 @@ rule HaplotypeCaller:
 rule mosdepth:
     threads: int(config['rules_settings']['mosdepth']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['mosdepth']['runtime']),
-        mem_mb =  int(config['rules_settings']['mosdepth']['mem_mb']),
+        runtime = int(config['rules_settings']['mosdepth']['runtime']),
+        mem_mb = int(config['rules_settings']['mosdepth']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['mosdepth']['cpus_per_task'])
     input:
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
@@ -107,8 +106,8 @@ rule mosdepth:
 rule mpileup: 
     threads: int(config['rules_settings']['mpileup']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['mpileup']['runtime']),
-        mem_mb =  int(config['rules_settings']['mpileup']['mem_mb']),
+        runtime = int(config['rules_settings']['mpileup']['runtime']),
+        mem_mb = int(config['rules_settings']['mpileup']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['mpileup']['cpus_per_task'])
     input:
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
@@ -133,8 +132,8 @@ rule mpileup:
 rule DeepVariant:
     threads: int(config['rules_settings']['DeepVariant']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['DeepVariant']['runtime']),
-        mem_mb =  int(config['rules_settings']['DeepVariant']['mem_mb']),
+        runtime = int(config['rules_settings']['DeepVariant']['runtime']),
+        mem_mb = int(config['rules_settings']['DeepVariant']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['DeepVariant']['cpus_per_task'])
     input:
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
@@ -158,8 +157,8 @@ rule DeepVariant:
 rule resolve_conflicts: 
     threads: int(config['rules_settings']['resolve_conflicts']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['resolve_conflicts']['runtime']),
-        mem_mb =  int(config['rules_settings']['resolve_conflicts']['mem_mb']),
+        runtime = int(config['rules_settings']['resolve_conflicts']['runtime']),
+        mem_mb = int(config['rules_settings']['resolve_conflicts']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['resolve_conflicts']['cpus_per_task'])
     input:
         hc_vcf = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.haplotype.caller.vcf.gz"),
@@ -184,8 +183,8 @@ rule resolve_conflicts:
 rule whatshap: 
     threads: int(config['rules_settings']['whatshap']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['whatshap']['runtime']),
-        mem_mb =  int(config['rules_settings']['whatshap']['mem_mb']),
+        runtime = int(config['rules_settings']['whatshap']['runtime']),
+        mem_mb = int(config['rules_settings']['whatshap']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['whatshap']['cpus_per_task'])
     input: 
         final_vcf = os.path.join(output_folder, "{sample}.conflict.resolved.vcf"),
@@ -193,7 +192,8 @@ rule whatshap:
         bai = os.path.join(output_folder, "{sample}.sorted.dedup.bam.bai")
     output:
         phased_vcf = os.path.join(output_folder, "{sample}.phased.vcf.gz"),
-        phased_vcf_tbi = os.path.join(output_folder, "{sample}.phased.vcf.gz.tbi")
+        phased_vcf_tbi = os.path.join(output_folder, "{sample}.phased.vcf.gz.tbi"),
+        conflict_vcf = os.path.join(output_folder, "{sample}.conflict.resolved.vcf.gz"),
     params: 
         container_name = get_full_container('python_and_whatshap')
     shell: 
@@ -211,8 +211,8 @@ rule whatshap:
 checkpoint PloidyContaminationQC:
     threads: int(config['rules_settings']['PloidyContaminationQC']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['PloidyContaminationQC']['runtime']),
-        mem_mb =  int(config['rules_settings']['PloidyContaminationQC']['mem_mb']),
+        runtime = int(config['rules_settings']['PloidyContaminationQC']['runtime']),
+        mem_mb = int(config['rules_settings']['PloidyContaminationQC']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['PloidyContaminationQC']['cpus_per_task'])
     input: 
         hc_vcf = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.haplotype.caller.vcf.gz"),
@@ -235,8 +235,8 @@ checkpoint PloidyContaminationQC:
 rule index_reference: 
     threads: int(config['rules_settings']['index_reference']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['index_reference']['runtime']),
-        mem_mb =  int(config['rules_settings']['index_reference']['mem_mb']),
+        runtime = int(config['rules_settings']['index_reference']['runtime']),
+        mem_mb = int(config['rules_settings']['index_reference']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['index_reference']['cpus_per_task'])
     input:
         ancient(config['references']['amplicon'])
@@ -261,8 +261,8 @@ rule index_reference:
 rule gatk_dict:
     threads: int(config['rules_settings']['gatk_dict']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['gatk_dict']['runtime']),
-        mem_mb =  int(config['rules_settings']['gatk_dict']['mem_mb']),
+        runtime = int(config['rules_settings']['gatk_dict']['runtime']),
+        mem_mb = int(config['rules_settings']['gatk_dict']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['gatk_dict']['cpus_per_task'])
     input:
         ancient(config['references']['amplicon'])
@@ -283,8 +283,8 @@ rule gatk_dict:
 rule pseudogenic_synth_reads: 
     threads: int(config['rules_settings']['pseudogenic_synth_reads']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['pseudogenic_synth_reads']['runtime']),
-        mem_mb =  int(config['rules_settings']['pseudogenic_synth_reads']['mem_mb']),
+        runtime = int(config['rules_settings']['pseudogenic_synth_reads']['runtime']),
+        mem_mb = int(config['rules_settings']['pseudogenic_synth_reads']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['pseudogenic_synth_reads']['cpus_per_task'])
     output: 
         temp(os.path.join(output_folder, f"{pseudo_coords}.temp.pseudo_read1.fq.gz")),
@@ -306,8 +306,8 @@ rule pseudogenic_synth_reads:
 rule generate_pseudo_synth_bam: 
     threads: int(config['rules_settings']['generate_pseudo_synth_bam']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['generate_pseudo_synth_bam']['runtime']),
-        mem_mb =  int(config['rules_settings']['generate_pseudo_synth_bam']['mem_mb']),
+        runtime = int(config['rules_settings']['generate_pseudo_synth_bam']['runtime']),
+        mem_mb = int(config['rules_settings']['generate_pseudo_synth_bam']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['generate_pseudo_synth_bam']['cpus_per_task'])
     input: 
         pseudo_r1 = os.path.join(output_folder, f"{pseudo_coords}.temp.pseudo_read1.fq.gz"),
@@ -336,8 +336,8 @@ rule generate_pseudo_synth_bam:
 rule call_variants_different_in_gene: 
     threads: int(config['rules_settings']['call_variants_different_in_gene']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['call_variants_different_in_gene']['runtime']),
-        mem_mb =  int(config['rules_settings']['call_variants_different_in_gene']['mem_mb']),
+        runtime = int(config['rules_settings']['call_variants_different_in_gene']['runtime']),
+        mem_mb = int(config['rules_settings']['call_variants_different_in_gene']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['call_variants_different_in_gene']['cpus_per_task'])
     input:
         temp_bam = os.path.join(output_folder, f"{pseudo_coords}.pseudoalign.bam"), 
@@ -361,8 +361,8 @@ rule call_variants_different_in_gene:
 rule HaplotypeCallerAltPloidy: 
     threads: int(config['rules_settings']['HaplotypeCallerAltPloidy']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['HaplotypeCallerAltPloidy']['runtime']),
-        mem_mb =  int(config['rules_settings']['HaplotypeCallerAltPloidy']['mem_mb']),
+        runtime = int(config['rules_settings']['HaplotypeCallerAltPloidy']['runtime']),
+        mem_mb = int(config['rules_settings']['HaplotypeCallerAltPloidy']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['HaplotypeCallerAltPloidy']['cpus_per_task'])
     input: 
         bam = os.path.join(output_folder, "{sample}.sorted.dedup.bam"),
@@ -388,8 +388,8 @@ rule HaplotypeCallerAltPloidy:
 rule quality_checked_AltPloidy: 
     threads: int(config['rules_settings']['quality_checked_AltPloidy']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['quality_checked_AltPloidy']['runtime']),
-        mem_mb =  int(config['rules_settings']['quality_checked_AltPloidy']['mem_mb']),
+        runtime = int(config['rules_settings']['quality_checked_AltPloidy']['runtime']),
+        mem_mb = int(config['rules_settings']['quality_checked_AltPloidy']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['quality_checked_AltPloidy']['cpus_per_task'])
     input:
         hc_vcf_alt = os.path.join(output_folder, "{sample}.raw.caller.output", "{sample}.alt.ploidy.haplotype.caller.vcf.gz"),
@@ -411,8 +411,8 @@ rule quality_checked_AltPloidy:
 rule whatshap_polyphase: 
     threads: int(config['rules_settings']['whatshap_polyphase']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['whatshap_polyphase']['runtime']),
-        mem_mb =  int(config['rules_settings']['whatshap_polyphase']['mem_mb']),
+        runtime = int(config['rules_settings']['whatshap_polyphase']['runtime']),
+        mem_mb = int(config['rules_settings']['whatshap_polyphase']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['whatshap_polyphase']['cpus_per_task'])
     input: 
         final_vcf = os.path.join(output_folder, "{sample}.alt.ploidy.quality.checked.vcf"),
@@ -439,17 +439,17 @@ rule whatshap_polyphase:
 rule relatedness_phasing: 
     threads: int(config['rules_settings']['relatedness_phasing']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['relatedness_phasing']['runtime']),
-        mem_mb =  int(config['rules_settings']['relatedness_phasing']['mem_mb']),
+        runtime = int(config['rules_settings']['relatedness_phasing']['runtime']),
+        mem_mb = int(config['rules_settings']['relatedness_phasing']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['relatedness_phasing']['cpus_per_task'])
     input:
-        expand(os.path.join(output_folder, "{sample_f}.contamination_ploidy_results_mqc.txt"), sample_f=samples_in_family(wildcards, ped_file)),
-        expand(os.path.join(output_folder, "{sample_f}.conflict.resolved.vcf"), sample_f=samples_in_family(wildcards, ped_file)),
+        lambda wildcards: gen_input_for_family(wildcards, ped_file),
     output:
-        temp(os.path.join(output_folder, "{family}.family.ped.txt")),
-        expand(os.path.join(output_folder, "{sample_f}.family.phased.vcf"), sample_f=samples_in_family(wildcards, ped_file))
+        os.path.join(output_folder, "{family}.family.ped.txt")
+        #expand(os.path.join(output_folder, "{sample_f}.family.phased.vcf"), sample_f=samples_f)
     params: 
-        container_name = get_full_container('python_and_whatshap')
+        container_name = get_full_container('python_and_whatshap'),
+        samples_f = lambda wildcards: samples_in_family(wildcards, ped_file)
     shell: 
         '''
         {container_run_command} \
@@ -458,7 +458,7 @@ rule relatedness_phasing:
         {bind} {output_folder}:/pipeline/output \
         {bind} {ped_folder}:/pipeline/reference:ro \
         {env} GID={GID} {params.container_name} \
-        bash /pipeline/tools/components/phasing_relatedness/phasing_related.py --input_folder /pipeline/input --family {wildcards.family} \
+        python /pipeline/tools/components/phasing_relatedness/phasing_related.py --input_folder /pipeline/input --family {wildcards.family} \
         --ped_file /pipeline/reference/{ped_name} --output_prefix /pipeline/output --container {container_type}
         '''
         
@@ -466,8 +466,8 @@ rule relatedness_phasing:
 rule multiqc: 
     threads: int(config['rules_settings']['multiqc']['cpus_per_task'])
     resources: 
-        runtime =  int(config['rules_settings']['multiqc']['runtime']),
-        mem_mb =  int(config['rules_settings']['multiqc']['mem_mb']),
+        runtime = int(config['rules_settings']['multiqc']['runtime']),
+        mem_mb = int(config['rules_settings']['multiqc']['mem_mb']),
         cpus_per_task = int(config['rules_settings']['multiqc']['cpus_per_task'])
     input:
         fastp_json = os.path.join(output_folder, "{sample}.json"),
