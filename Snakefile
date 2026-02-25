@@ -446,7 +446,6 @@ rule relatedness_phasing:
         lambda wildcards: gen_input_for_family(wildcards, ped_file),
     output:
         os.path.join(output_folder, "{family}.family.ped.txt")
-        #expand(os.path.join(output_folder, "{sample_f}.family.phased.vcf"), sample_f=samples_f)
     params: 
         container_name = get_full_container('python_and_whatshap'),
         samples_f = lambda wildcards: samples_in_family(wildcards, ped_file)

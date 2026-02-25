@@ -1,18 +1,17 @@
 # ===== INPUT SETTINGS ==== 
 
 input:
-    input_folder: '/primary/data/common/VDKN/paper_diagnostics_amps/paper_diagnostics_amps_RAW/phasing_test_RAW/' # input folder with raw fastq files 
+    input_folder: '/primary/data/common/VDKN/paper_diagnostics_amps/paper_diagnostics_amps_RAW/' # input folder with raw fastq files 
     include_patterns: []  # list of patterns or sample names to include, e.g. ['CYP21A2', 'SEQ[1,6]']. if empty, all are included 
     exclude_patterns: [] # list of patterns or sample names to exclude, e.g. ['SAMPLE_1', 'SEQ[2,7]']
     fastq_extensions: ['fastq.gz', 'fq.gz']
-    ped_file: '/primary/data/zantysheva/projects/vdkn/ped_test_l1.tsv' # OPTIONAL ped file that will be used for relatedness phasing 
+    ped_file: '/primary/data/zantysheva/projects/vdkn/mlpa_cohort_ped.tsv' # OPTIONAL ped file that will be used for relatedness phasing. If none, only read-based phasing is done  
 
 # ===== OUTPUT SETTINGS ====         
 output:
-    output_folder: '/primary/data/common/VDKN/paper_diagnostics_amps/phasing_test'
+    output_folder: '/primary/data/common/VDKN/paper_diagnostics_amps/paper_diagnostics_amps'
     save_all_callers: True
-    # True or False 
-    # this flag is used to mark if all callers outputs should be preserved, or only conflict resolved output should be saved 
+    # True or False; this flag is used to mark if all callers outputs should be preserved, or only conflict resolved output should be saved 
 
 # ===== REFERENCE SETTINGS ====  
 
@@ -117,7 +116,7 @@ rules_settings:
         # high coverages (~3000X) result in very long polyphase runtimes 
         runtime: 48000 
         mem_mb: 15000
-        cpus_per_task: 15
+        cpus_per_task: 8
 
     relatedness_phasing:
         runtime: 100

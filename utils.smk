@@ -191,7 +191,7 @@ def get_families(ped_file):
 
 def samples_in_family(wildcards, ped_file): 
     '''
-    Gets samples in family that can be phased (quality not critical and have ploidy not 3
+    Gets samples in family that can be phased 
     :param wildcards: Snakemake wildcards
     :param ped_file: supplied full ped file
     '''
@@ -207,11 +207,7 @@ def samples_in_family(wildcards, ped_file):
     for line in family_lines:
         for s in line[1:-2]: 
             if s != 'proxy':
-                with checkpoints.PloidyContaminationQC.get(sample=s).output.qc_result.open() as file:
-                    pl_line = file.readlines()[1].strip('\n').split('\t')
-                    if (pl_line[-2] != "[CRITICAL]"): 
-                        if int(pl_line[-4]) <= 2:
-                            samples.append(s)
+                samples.append(s)
 
     return list(set(samples)) 
 
