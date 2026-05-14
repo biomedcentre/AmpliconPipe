@@ -26,23 +26,24 @@ def read_vcf(link):
     '''
     vcf = pd.read_csv(link, sep='\t', comment='#', header=None,
           names=['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', 'SAMPLE'], index_col=False)  
-
-    contig_name = vcf['CHROM'][0].split(':')[-1]
-    if '-' in contig_name:
-        contig_start = int(contig_name.split('-')[0])
-    elif '+' in contig_name: 
-        contig_start = int(contig_name.split('+')[0])
-    else: 
-        contig_start = int(contig_name)
-        
-    vcf = vcf.assign(CHROM=vcf['CHROM'].map(lambda x: x.split(':')[0]),
-                    POS=vcf['POS'] + contig_start - 1,
-                    GT=vcf['SAMPLE'].map(lambda x: x.split(':')[0]).str.replace('|', '/', regex=False))
-
-    # TO DO: add calling region filter or add it to previous pipeline stages 
     
-    vcf = vcf.assign(AD=vcf['SAMPLE'].map(lambda x: x.split(':')[1]),
-                  DP=vcf['SAMPLE'].map(lambda x: x.split(':')[2]).astype(int))
+    if len(vcf) > 0:
+        contig_name = vcf['CHROM'][0].split(':')[-1]
+        if '-' in contig_name:
+            contig_start = int(contig_name.split('-')[0])
+        elif '+' in contig_name: 
+            contig_start = int(contig_name.split('+')[0])
+        else: 
+            contig_start = int(contig_name)
+            
+        vcf = vcf.assign(CHROM=vcf['CHROM'].map(lambda x: x.split(':')[0]),
+                        POS=vcf['POS'] + contig_start - 1,
+                        GT=vcf['SAMPLE'].map(lambda x: x.split(':')[0]).str.replace('|', '/', regex=False))
+    
+        # TO DO: add calling region filter or add it to previous pipeline stages 
+        
+        vcf = vcf.assign(AD=vcf['SAMPLE'].map(lambda x: x.split(':')[1]),
+                      DP=vcf['SAMPLE'].map(lambda x: x.split(':')[2]).astype(int))
     
     return vcf
 

@@ -14,37 +14,39 @@ def read_vcf(link, mode):
     vcf = pd.read_csv(link, sep='\t', comment='#', header=None,
           names=['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', 'SAMPLE'], index_col=False)  
 
-
-    contig_name = vcf['CHROM'][0].split(':')[-1]
-    if '-' in contig_name:
-        contig_start = int(contig_name.split('-')[0])
-    elif '+' in contig_name: 
-        contig_start = int(contig_name.split('+')[0])
-    else: 
-        contig_start = int(contig_name)
+    if len(vcf) > 0:
+        contig_name = vcf['CHROM'][0].split(':')[-1]
+        if '-' in contig_name:
+            contig_start = int(contig_name.split('-')[0])
+        elif '+' in contig_name: 
+            contig_start = int(contig_name.split('+')[0])
+        else: 
+            contig_start = int(contig_name)
+            
+        vcf = vcf.assign(CHROM=vcf['CHROM'].map(lambda x: x.split(':')[0]),
+                        POS=(vcf['POS'] + contig_start - 1).astype(int),
+                        GT=vcf['SAMPLE'].map(lambda x: x.split(':')[0]).str.replace('|', '/', regex=False))
         
-    vcf = vcf.assign(CHROM=vcf['CHROM'].map(lambda x: x.split(':')[0]),
-                    POS=(vcf['POS'] + contig_start - 1).astype(int),
-                    GT=vcf['SAMPLE'].map(lambda x: x.split(':')[0]).str.replace('|', '/', regex=False))
-    
-    # TO DO: add calling region filter or add it to previous pipeline stages 
-    
-    # add DP detection 
-    if mode == 'hc': 
-        vcf = vcf.assign(AD=vcf['SAMPLE'].map(lambda x: x.split(':')[1]),
-                  DP=vcf['SAMPLE'].map(lambda x: x.split(':')[2]).astype(int))
-    elif mode == 'dv': 
-        vcf = vcf[vcf['FILTER'] == 'PASS']
-        vcf = vcf.assign(AD=vcf['SAMPLE'].map(lambda x: x.split(':')[3]),
-                  DP=vcf['SAMPLE'].map(lambda x: x.split(':')[2]).astype(int))
-    elif mode == 'pileup': 
-        # TO DO modify multiallelic indels
-        new_refalt = pd.DataFrame(list(vcf.apply(lambda x: modify_indel_bcftools(x['REF'], x['ALT'], x['INFO']), axis=1)), columns=['REF', 'ALT'])
-        vcf = vcf.assign(AD=vcf['SAMPLE'].map(lambda x: x.split(':')[3]),
-                  DP=vcf['SAMPLE'].map(lambda x: x.split(':')[2]).astype(int),
-                  REF=new_refalt['REF'],
-                  ALT=new_refalt['ALT'],
-                  ) 
+        # TO DO: add calling region filter or add it to previous pipeline stages 
+        
+        # add DP detection 
+        if mode == 'hc': 
+            vcf = vcf.assign(AD=vcf['SAMPLE'].map(lambda x: x.split(':')[1]),
+                      DP=vcf['SAMPLE'].map(lambda x: x.split(':')[2]).astype(int))
+        elif mode == 'dv': 
+            vcf = vcf[vcf['FILTER'] == 'PASS']
+            vcf = vcf.assign(AD=vcf['SAMPLE'].map(lambda x: x.split(':')[3]),
+                      DP=vcf['SAMPLE'].map(lambda x: x.split(':')[2]).astype(int))
+        elif mode == 'pileup': 
+            # TO DO modify multiallelic indels
+            new_refalt = pd.DataFrame(list(vcf.apply(lambda x: modify_indel_bcftools(x['REF'], x['ALT'], x['INFO']), axis=1)), columns=['REF', 'ALT'])
+            vcf = vcf.assign(AD=vcf['SAMPLE'].map(lambda x: x.split(':')[3]),
+                      DP=vcf['SAMPLE'].map(lambda x: x.split(':')[2]).astype(int),
+                      REF=new_refalt['REF'],
+                      ALT=new_refalt['ALT'],
+                      )
+    else: 
+        vcf = pd.DataFrame([], columns=['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', 'SAMPLE', 'GT', 'AD', 'DP'])
     
     return vcf
 
@@ -310,9 +312,12 @@ def form_final_vcf(resolved, vcfs):
             #+ ':' + quality_source 
             #vcf_in_pos_line['FORMAT'] = vcf_in_pos_line['FORMAT'] + ':SR'
             
-            final_vcf.append(vcf_in_pos_line)    
-
-    final_vcf = pd.concat(final_vcf, axis=1).T.drop(['GT', 'DP', 'AD'], axis=1).sort_values(by='POS').reset_index(drop=True)
+            final_vcf.append(vcf_in_pos_line)  
+            
+    if len(final_vcf) > 0:
+        final_vcf = pd.concat(final_vcf, axis=1).T.drop(['GT', 'DP', 'AD'], axis=1).sort_values(by='POS').reset_index(drop=True)
+    else: 
+        final_vcf = pd.DataFrame([], columns=['CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', 'SAMPLE'])
 
     return final_vcf
 
@@ -390,7 +395,8 @@ if __name__ == '__main__':
 
     resolved = resolved_to_frame(resolved)
     final_vcf = form_final_vcf(resolved, vcfs)
-    final_vcf = restore_orig_coordinates(final_vcf, vcf_links['hc'])
+    if len(final_vcf) > 0:
+        final_vcf = restore_orig_coordinates(final_vcf, vcf_links['hc'])
     comments =  form_comments_for_final_vcf(vcf_comments)
     
     write_vcf(comments, final_vcf, f'{args.output_prefix}.conflict.resolved.vcf')

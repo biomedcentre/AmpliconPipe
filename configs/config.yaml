@@ -1,15 +1,15 @@
 # ===== INPUT SETTINGS ==== 
 
 input:
-    input_folder: '/primary/data/common/VDKN/paper_diagnostics_amps/paper_diagnostics_amps_RAW/' # input folder with raw fastq files 
+    input_folder: '/primary/data/common/VDKN/OwnAmplicons_RAW/2026-12-05_allele_specific_v2_merged_lanes' # input folder with raw fastq files 
     include_patterns: []  # list of patterns or sample names to include, e.g. ['CYP21A2', 'SEQ[1,6]']. if empty, all are included 
     exclude_patterns: [] # list of patterns or sample names to exclude, e.g. ['SAMPLE_1', 'SEQ[2,7]']
     fastq_extensions: ['fastq.gz', 'fq.gz']
-    ped_file: '/primary/data/zantysheva/projects/vdkn/mlpa_cohort_ped.tsv' # OPTIONAL ped file that will be used for relatedness phasing. If none, only read-based phasing is done  
+    ped_file: # OPTIONAL ped file that will be used for relatedness phasing. If none, only read-based phasing is done  /primary/data/zantysheva/projects/vdkn/mlpa_cohort_ped.tsv
 
 # ===== OUTPUT SETTINGS ====         
 output:
-    output_folder: '/primary/data/common/VDKN/paper_diagnostics_amps/paper_diagnostics_amps'
+    output_folder: '/primary/data/common/VDKN/paper_diagnostics_amps/allele_specific_amps_v2'
     save_all_callers: True
     # True or False; this flag is used to mark if all callers outputs should be preserved, or only conflict resolved output should be saved 
 
