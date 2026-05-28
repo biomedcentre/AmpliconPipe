@@ -1,25 +1,25 @@
 # ===== INPUT SETTINGS ==== 
 
 input:
-    input_folder: '/primary/data/common/VDKN/OwnAmplicons_RAW/2026-12-05_allele_specific_v2_merged_lanes' # input folder with raw fastq files 
+    input_folder: '/your/folder/with/fastq' # input folder with raw fastq files 
     include_patterns: []  # list of patterns or sample names to include, e.g. ['CYP21A2', 'SEQ[1,6]']. if empty, all are included 
     exclude_patterns: [] # list of patterns or sample names to exclude, e.g. ['SAMPLE_1', 'SEQ[2,7]']
     fastq_extensions: ['fastq.gz', 'fq.gz']
-    ped_file: # OPTIONAL ped file that will be used for relatedness phasing. If none, only read-based phasing is done  /primary/data/zantysheva/projects/vdkn/mlpa_cohort_ped.tsv
+    ped_file: '/your/file/related_ped.txt' # OPTIONAL ped file that will be used for relatedness phasing. If none, only read-based phasing is done  
 
 # ===== OUTPUT SETTINGS ====         
 output:
-    output_folder: '/primary/data/common/VDKN/paper_diagnostics_amps/allele_specific_amps_v2'
-    save_all_callers: True
-    # True or False; this flag is used to mark if all callers outputs should be preserved, or only conflict resolved output should be saved 
+    output_folder: '/your/folder/for/output'
+    save_all_callers: False
+    # True or False; this flag is used to mark if all callers outputs should be preserved, or only harmonyzed output should be saved 
 
 # ===== REFERENCE SETTINGS ====  
 
 references: 
-    amplicon: '/primary/data/zantysheva/git_clones/AmpliconPipe/reference/CYP21A2/CYP21A2-amp_hg38.fasta' # Amplicon fasta .fasta
-    amplicon_bed: '/primary/data/zantysheva/git_clones/AmpliconPipe/reference/CYP21A2/CYP21A2.bed' # bed file for calling interval. Can be the all amplicon span
+    amplicon: '/path/to/repo/AmpliconPipe/reference/CYP21A2/CYP21A2-amp_hg38.fasta' # Amplicon fasta .fasta
+    amplicon_bed: '/path/to/repo/AmpliconPipe/reference/CYP21A2/CYP21A2.bed' # bed file for calling interval. Can be the all amplicon span
     pseudogene_coordinates: 'chr6:32005689-32008399' # OPTIONAL. If the amplicon has highly homological sequence in genome (>=90%) e.g. CYP21A1P for CYP21A2, CYP2D7 for CYP2D6, SMN2 for SMN1, coordinates can be given to check contamination from this region specifically. Better performance is achieved if coordinates for homological region include all the length of homological region in amplicon, not only gene or pseudogene. Adding extra ~1000 b.p on sides also can help 
-    full_genome: '/primary/data/zantysheva/data/reference/Homo_sapiens_assembly38/Homo_sapiens_assembly38.fasta' # OPTIONAL. full reference sequence of the organism. Required only if pseudogene coordinates are given 
+    full_genome: '/path/to/reference/Homo_sapiens_assembly38/Homo_sapiens_assembly38.fasta' # OPTIONAL. full reference sequence of the organism. Required only if pseudogene coordinates are given 
 
 
 # ===== EXECUTION PARAMS ===== 
