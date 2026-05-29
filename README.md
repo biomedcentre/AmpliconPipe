@@ -64,3 +64,28 @@ snakemake -p --cores 15 --default-resources "tmpdir='/your/tmp/dir/tmp'" --confi
 ```
 
 # Results 
+
+__Files in output for a sample:__ 
+File Postfix | If Always Present | Explanation 
+------------- | ------------- | ------------- 
+.sorted.dedup.bam | Always | Reads aligned to provided amplicon reference 
+.mosdepth.global.dist.txt, .mosdepth.region.dist.txt, .mosdepth.summary.txt, .regions.bed.gz, .thresholds.bed.gz | Always | Mosdepth output (coverage stats) 
+.json | Always | Fastp output 
+.conflict.resolved.vcf.gz | Always | Harmonyzed variant calls; vcf combines HC, DV and bcftools records that were found to be true 
+.variant_conflict_resolution.log | Always | Extended caller conflict resolution log 
+.contamination_ploidy_results_mqc.txt | Always | Results of copy number calling and contamination check 
+.contamination_ploidy_check.log | Always | Extended log of distribution fit for copy number calling and contamination check 
+.VAF_mqc.png | Always | VAF distributions of pseudogenic/non-pseudogenic/all variants 
+.phased.vcf.gz | Always | Read-based phased vcf (phased with whatshap) 
+.multiqc.html | Always | Multiqc report, combining mosdepth, fastp, copy number calling, and contamination check 
+.multiqc_data | Always | Folder with data for multiqc report 
+.family.phased.vcf | If ped file was given, sample had family and is not copy number 3 | Vcf with family-based phasing results 
+.raw.caller.output | If output of all callers is saved | Folder with output of all 3 callers 
+.raw.caller.output/.bcftools.vcf.gz | If output of all callers is saved | Bcftools calls 
+.raw.caller.output/.deepvariant.vcf | If output of all callers is saved | DeepVariant calls
+.raw.caller.output/.visual_report.html | If output of all callers is saved | DeepVariant stats 
+.raw.caller.output/.haplotype.caller.vcf.gz | If output of all callers is saved | HaplotypeCaller calls
+.alt.ploidy.quality.checked.vcf.gz | If predicted copy number is 3 | Variant calls via HaplotypeCaller with ploidy 3 after additional filtering 
+.alt.ploidy.quality.log  | If predicted copy number is 3 | Extended log of filtering HaplotypeCaller ploidy 3 calls 
+.alt.ploidy.phased.vcf.gz | If predicted copy number is 3  | Read-based phased vcf (phased with whatshap) for ploidy 3 calls
+.alt.ploidy.haplotype.caller.vcf.gz | If predicted copy number is 3 and if output of all callers is saved | Variant calls via HaplotypeCaller with ploidy 3
