@@ -5,7 +5,7 @@ Supplied reference example is CYP21A2 long-range amplicon, but pipeline can be s
 
 # Requirements 
 
-Requirements are snakemake v7.32.4 and engine (docker v29.1.3 or singularity v3.8.7). Snakemake and singularity can be installed with provided conda enviroment (see Installation). Docker cannot be installed with conda, see https://docs.docker.com/engine/install/ for installation. 
+Requirements are snakemake v7.32.4 or higher, make v4.4.1 and engine (docker v29.1.3 or singularity v3.8.7 or higher). Snakemake, make, and singularity can be installed with provided conda enviroment (see Installation). Docker cannot be installed with conda, see https://docs.docker.com/engine/install/ for installation. 
 
 # Installation 
 
