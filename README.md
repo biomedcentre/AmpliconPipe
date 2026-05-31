@@ -1,7 +1,7 @@
 # AmpliconPipe
 Pipeline for processing long-range amplicons short-read NGS from fastq. Includes variant harmonization between different callers, copy number calling based on VAFs in amplicon and additional QC based on VAF. If copy number equal to 3 detected, calls and filters variants for this copy number. Supports either read-based phasing or family-based phasing logic, if ped file is supplied.
 Supplied reference example is CYP21A2 long-range amplicon, but pipeline can be set to run on any reference via config.
-<img width="4613" height="1517" alt="AmpliconPipe (3)" src="https://github.com/user-attachments/assets/8f0f2d39-522e-424f-aec4-8f34e26cb323" />
+<img width="1819" height="864" alt="AmpliconPipe" src="https://github.com/user-attachments/assets/7cb20dc6-81b6-42d2-8dd1-a3afdb734969" />
 
 # Requirements 
 
